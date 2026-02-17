@@ -1,9 +1,9 @@
 import {
-  FilmIcon,
-  UsersIcon,
-  ShoppingCartIcon,
-  CurrencyRupeeIcon,
   CheckBadgeIcon,
+  CurrencyRupeeIcon,
+  FilmIcon,
+  ShoppingCartIcon,
+  UsersIcon,
 } from "@heroicons/react/24/outline";
 
 const cardConfig = [
@@ -41,26 +41,24 @@ const cardConfig = [
 
 const OverviewCards = ({ data }) => {
   return (
-    <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
       {cardConfig.map((card) => {
         const Icon = card.icon;
-
         return (
           <div
             key={card.key}
-            className={`relative overflow-hidden rounded-xl shadow-md p-6 text-white bg-gradient-to-r ${card.gradient} transition transform hover:-translate-y-1 hover:shadow-lg`}
+            className={`relative overflow-hidden rounded-xl bg-gradient-to-r p-6 text-white shadow-md transition hover:-translate-y-1 hover:shadow-lg ${card.gradient}`}
           >
             <div className="flex items-center justify-between">
-              <Icon className="w-8 h-8 opacity-90" />
+              <Icon className="h-8 w-8 opacity-90" />
             </div>
-
             <div className="mt-6">
               <h3 className="text-3xl font-bold">
                 {card.key === "totalRevenue"
-                  ? `₹${data?.[card.key]?.toLocaleString() || 0}`
+                  ? `Rs. ${data?.[card.key]?.toLocaleString() || 0}`
                   : data?.[card.key] ?? 0}
               </h3>
-              <p className="text-sm opacity-90 mt-1">{card.label}</p>
+              <p className="mt-1 text-sm opacity-90">{card.label}</p>
             </div>
           </div>
         );

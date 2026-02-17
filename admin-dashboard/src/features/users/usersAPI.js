@@ -1,8 +1,8 @@
-import axiosInstance from "../../services/axiosInstance";
+import api from "../../api/axios";
 
 export const usersAPI = {
   getAll: async () => {
-    const response = await axiosInstance.get("/api/admin/users");
+    const response = await api.get("/api/admin/users");
     return response.data;
   },
 };

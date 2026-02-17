@@ -1,8 +1,8 @@
-import axiosInstance from "../../services/axiosInstance";
+import api from "../../api/axios";
 
 export const authAPI = {
   adminLogin: async (credentials) => {
-    const response = await axiosInstance.post(
+    const response = await api.post(
       "/api/auth/admin/login",
       credentials
     );

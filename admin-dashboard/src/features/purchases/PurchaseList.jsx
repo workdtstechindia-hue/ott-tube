@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import Dropdown from "../../components/ui/Dropdown";
+import SearchBar from "../../components/ui/SearchBar";
+import Skeleton from "../../components/ui/Skeleton";
 import { purchasesAPI } from "./purchasesAPI";
 
 const ITEMS_PER_PAGE = 8;
@@ -12,202 +15,155 @@ const PurchaseList = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    const fetchPurchases = async () => {
+      try {
+        const res = await purchasesAPI.getAll();
+        if (!res.success) throw new Error(res.message);
+        setPurchases(res.data || []);
+      } catch (err) {
+        setError(err.message || "Failed to fetch purchases");
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchPurchases();
   }, []);
 
-  const fetchPurchases = async () => {
-    try {
-      const res = await purchasesAPI.getAll();
-
-      if (!res.success) {
-        throw new Error(res.message);
-      }
-
-      setPurchases(res.data || []);
-    } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to fetch purchases"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /* =========================
-     FILTERING + SEARCH
-  ========================= */
   const filteredPurchases = useMemo(() => {
     let data = [...purchases];
-
-    if (search) {
+    if (search.trim()) {
+      const query = search.toLowerCase().trim();
       data = data.filter(
         (item) =>
-          item.user?.name
-            ?.toLowerCase()
-            .includes(search.toLowerCase()) ||
-          item.movie?.title
-            ?.toLowerCase()
-            .includes(search.toLowerCase())
+          item.user?.name?.toLowerCase().includes(query) ||
+          item.movie?.title?.toLowerCase().includes(query)
       );
     }
 
     if (statusFilter !== "all") {
       data = data.filter(
-        (item) =>
-          item.paymentStatus?.toLowerCase() ===
-          statusFilter.toLowerCase()
+        (item) => item.paymentStatus?.toLowerCase() === statusFilter.toLowerCase()
       );
     }
-
     return data;
   }, [purchases, search, statusFilter]);
 
-  /* =========================
-     REVENUE SUMMARY
-  ========================= */
   const totalRevenue = filteredPurchases
-    .filter((p) => p.paymentStatus === "paid")
-    .reduce((acc, curr) => acc + (curr.amount || 0), 0);
-
+    .filter((item) => item.paymentStatus === "paid")
+    .reduce((sum, item) => sum + (item.amount || 0), 0);
   const paidTransactions = filteredPurchases.filter(
-    (p) => p.paymentStatus === "paid"
+    (item) => item.paymentStatus === "paid"
   ).length;
 
-  /* =========================
-     PAGINATION
-  ========================= */
-  const totalPages = Math.ceil(
-    filteredPurchases.length / ITEMS_PER_PAGE
-  );
-
-  const paginatedPurchases = filteredPurchases.slice(
+  const totalPages = Math.ceil(filteredPurchases.length / ITEMS_PER_PAGE);
+  const paginated = filteredPurchases.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
 
   if (loading) {
     return (
-      <div className="bg-white shadow-md rounded-xl p-6">
-        <div className="h-40 bg-gray-200 animate-pulse rounded-xl" />
+      <div className="space-y-4">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-[420px] w-full" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 text-red-600 p-6 rounded-xl shadow-md">
+      <div className="rounded-xl border border-red-400/30 bg-red-500/10 p-5 text-red-600 dark:text-red-300">
         {error}
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Revenue Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div className="bg-white shadow-md rounded-xl p-6">
-          <p className="text-sm text-gray-500">
-            Total Revenue
-          </p>
-          <p className="text-2xl font-bold text-gray-800">
-            ₹{totalRevenue.toLocaleString()}
+    <section className="space-y-6">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="card-surface rounded-xl p-6">
+          <p className="text-sm text-[var(--text-muted)]">Total Revenue</p>
+          <p className="text-2xl font-semibold text-[var(--text-primary)]">
+            Rs. {totalRevenue.toLocaleString()}
           </p>
         </div>
-
-        <div className="bg-white shadow-md rounded-xl p-6">
-          <p className="text-sm text-gray-500">
-            Paid Transactions
-          </p>
-          <p className="text-2xl font-bold text-gray-800">
+        <div className="card-surface rounded-xl p-6">
+          <p className="text-sm text-[var(--text-muted)]">Paid Transactions</p>
+          <p className="text-2xl font-semibold text-[var(--text-primary)]">
             {paidTransactions}
           </p>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 sm:justify-between">
-        <input
-          type="text"
-          placeholder="Search by user or movie..."
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
+        <SearchBar
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
+          onSearch={(value) => {
+            setSearch(value);
             setCurrentPage(1);
           }}
-          className="border px-4 py-2 rounded-xl focus:ring-2 focus:ring-gray-900 outline-none"
+          placeholder="Search by user or movie..."
         />
 
-        <select
+        <Dropdown
           value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
+          onChange={(value) => {
+            setStatusFilter(value);
             setCurrentPage(1);
           }}
-          className="border px-4 py-2 rounded-xl focus:ring-2 focus:ring-gray-900 outline-none"
-        >
-          <option value="all">All Status</option>
-          <option value="paid">Paid</option>
-          <option value="pending">Pending</option>
-        </select>
+          options={[
+            { value: "all", label: "All Status" },
+            { value: "paid", label: "Paid" },
+            { value: "pending", label: "Pending" },
+          ]}
+        />
       </div>
 
-      {/* Table */}
-      <div className="bg-white shadow-md rounded-xl overflow-hidden">
-        {paginatedPurchases.length === 0 ? (
-          <div className="p-10 text-center text-gray-500">
-            No purchases found.
-          </div>
+      <div className="card-surface overflow-hidden rounded-2xl">
+        {paginated.length === 0 ? (
+          <div className="p-10 text-center text-[var(--text-muted)]">No purchases found.</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-600">
+            <table className="table-surface w-full text-sm">
+              <thead className="table-head">
                 <tr>
-                  <th className="p-4">User</th>
-                  <th className="p-4">Movie</th>
-                  <th className="p-4">Amount</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Purchase Date</th>
-                  <th className="p-4">Expiry Date</th>
+                  <th className="px-5 py-4 text-center align-middle">User</th>
+                  <th className="px-5 py-4 text-center align-middle">Movie</th>
+                  <th className="px-5 py-4 text-center align-middle">Amount</th>
+                  <th className="px-5 py-4 text-center align-middle">Status</th>
+                  <th className="px-5 py-4 text-center align-middle">Purchase Date</th>
+                  <th className="px-5 py-4 text-center align-middle">Expiry Date</th>
                 </tr>
               </thead>
-
               <tbody>
-                {paginatedPurchases.map((item) => (
+                {paginated.map((item) => (
                   <tr
                     key={item.id}
-                    className="border-t hover:bg-gray-50 transition"
+                    className="table-row h-14 transition"
                   >
-                    <td className="p-4 font-medium text-gray-800">
+                    <td className="w-1/6 px-5 py-4 text-center align-middle font-medium text-[var(--text-primary)]">
                       {item.user?.name}
                     </td>
-                    <td className="p-4 text-gray-600">
-                      {item.movie?.title}
+                    <td className="w-1/6 px-5 py-4 text-center align-middle text-[var(--text-muted)]">
+                      <p className="truncate">{item.movie?.title}</p>
                     </td>
-                    <td className="p-4">
-                      ₹{item.amount}
-                    </td>
-                    <td className="p-4">
+                    <td className="w-1/6 px-5 py-4 text-center align-middle">Rs. {item.amount}</td>
+                    <td className="w-1/6 px-5 py-4 text-center align-middle">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        className={`rounded-full px-3 py-1 text-xs font-medium ${
                           item.paymentStatus === "paid"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
+                            : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
                         }`}
                       >
                         {item.paymentStatus}
                       </span>
                     </td>
-                    <td className="p-4 text-gray-500">
-                      {new Date(
-                        item.purchasedAt
-                      ).toLocaleDateString()}
+                    <td className="w-1/6 px-5 py-4 text-center align-middle text-[var(--text-muted)]">
+                      {new Date(item.purchasedAt).toLocaleDateString()}
                     </td>
-                    <td className="p-4 text-gray-500">
-                      {new Date(
-                        item.expiryDate
-                      ).toLocaleDateString()}
+                    <td className="w-1/6 px-5 py-4 text-center align-middle text-[var(--text-muted)]">
+                      {new Date(item.expiryDate).toLocaleDateString()}
                     </td>
                   </tr>
                 ))}
@@ -216,28 +172,25 @@ const PurchaseList = () => {
           </div>
         )}
 
-        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex justify-end gap-2 p-4 border-t">
-            {Array.from({ length: totalPages }).map(
-              (_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`px-3 py-1 rounded-lg text-sm ${
-                    currentPage === i + 1
-                      ? "bg-gray-900 text-white"
-                      : "bg-gray-100"
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              )
-            )}
+          <div className="flex justify-end gap-2 border-t border-[var(--border-color)] p-4">
+            {Array.from({ length: totalPages }).map((_, index) => (
+              <button
+                key={`page-${index + 1}`}
+                onClick={() => setCurrentPage(index + 1)}
+                className={`rounded-lg px-3 py-1 text-sm ${
+                  currentPage === index + 1
+                    ? "bg-gray-900 text-white"
+                    : "bg-black/10 text-[var(--text-primary)] dark:bg-white/10"
+                }`}
+              >
+                {index + 1}
+              </button>
+            ))}
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 };
 

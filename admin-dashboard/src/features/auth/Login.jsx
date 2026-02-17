@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { adminLogin, clearAuthError } from "./authSlice";
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const { loading, error, token } = useSelector((state) => state.auth);
 
@@ -12,7 +13,6 @@ const Login = () => {
     email: "",
     password: "",
   });
-  const [successMessage, setSuccessMessage] = useState("");
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -29,39 +29,50 @@ const Login = () => {
 
   useEffect(() => {
     if (!token) return;
-
-    setSuccessMessage("Login successful. Redirecting...");
+    const redirectPath = location.state?.from?.pathname || "/";
     const timeout = setTimeout(() => {
-      navigate("/", { replace: true });
+      navigate(redirectPath, { replace: true });
     }, 600);
 
     return () => clearTimeout(timeout);
-  }, [token, navigate]);
+  }, [token, navigate, location.state]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="w-full max-w-md bg-white shadow-xl rounded-xl p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4 transition-colors duration-300">
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 shadow-xl rounded-xl p-8 transition-colors duration-300">
+        
+        {/* Header */}
         <div className="text-center mb-6">
-          <div className="w-14 h-14 mx-auto bg-gray-900 rounded-xl mb-3"></div>
-          <h2 className="text-2xl font-semibold text-gray-800">Admin Login</h2>
-          <p className="text-sm text-gray-500">Sign in to access the dashboard</p>
+          <div className="w-14 h-14 mx-auto bg-gray-900 dark:bg-white rounded-xl mb-3"></div>
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
+            Admin Login
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Sign in to access the dashboard
+          </p>
         </div>
 
+        {/* Error Message */}
         {error && (
-          <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 rounded-lg">
+          <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 dark:bg-red-900/40 dark:text-red-400 rounded-lg">
             {error}
           </div>
         )}
 
-        {successMessage && (
-          <div className="mb-4 p-3 text-sm text-green-600 bg-green-50 rounded-lg">
-            {successMessage}
+        {/* Success Message */}
+        {token && (
+          <div className="mb-4 p-3 text-sm text-green-600 bg-green-50 dark:bg-green-900/40 dark:text-green-400 rounded-lg">
+            Login successful. Redirecting...
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          
+          {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Email
+            </label>
             <input
               type="email"
               name="email"
@@ -69,13 +80,19 @@ const Login = () => {
               autoComplete="email"
               value={formData.email}
               onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg text-black placeholder:text-gray-500 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900"
               placeholder="admin@mail.com"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                         bg-white dark:bg-gray-700 
+                         text-gray-900 dark:text-white 
+                         placeholder:text-gray-400 dark:placeholder:text-gray-400
+                         focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white
+                         transition"
             />
           </div>
 
+          {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Password
             </label>
             <input
@@ -85,21 +102,29 @@ const Login = () => {
               autoComplete="current-password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-4 py-2 border rounded-lg text-black placeholder:text-gray-500 dark:text-white focus:outline-none focus:ring-2 focus:ring-gray-900"
               placeholder="********"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                         bg-white dark:bg-gray-700 
+                         text-gray-900 dark:text-white 
+                         placeholder:text-gray-400 dark:placeholder:text-gray-400
+                         focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-white
+                         transition"
             />
           </div>
 
+          {/* Button */}
           <button
             type="submit"
             disabled={loading}
-            className={`w-full py-2 rounded-xl text-white font-medium transition ${
-              loading ? "bg-gray-400 cursor-not-allowed" : "bg-gray-900 hover:bg-gray-800"
+            className={`w-full py-2 rounded-xl font-medium transition ${
+              loading
+                ? "bg-gray-400 cursor-not-allowed text-white"
+                : "bg-gray-900 hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200 text-white"
             }`}
           >
             {loading ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                <span className="w-4 h-4 border-2 border-white dark:border-gray-900 border-t-transparent rounded-full animate-spin"></span>
                 Signing in...
               </span>
             ) : (

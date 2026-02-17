@@ -11,7 +11,7 @@ const Layout = () => {
   const toggleCollapse = () => setIsCollapsed(!isCollapsed);
 
   return (
-    <div className="flex h-screen bg-gray-100 dark:bg-gray-950 overflow-hidden transition-colors">
+    <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors">
       <Sidebar
         isOpen={isSidebarOpen}
         isCollapsed={isCollapsed}
@@ -19,11 +19,11 @@ const Layout = () => {
         toggleCollapse={toggleCollapse}
       />
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex flex-1 flex-col">
         <Header toggleSidebar={toggleSidebar} />
 
         <main className="flex-1 overflow-y-auto p-6">
-          <div className="bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-md dark:shadow-gray-900/40 rounded-xl p-6 min-h-full transition-colors">
+          <div className="card-surface min-h-full rounded-2xl p-6 app-ease">
             <Outlet />
           </div>
         </main>

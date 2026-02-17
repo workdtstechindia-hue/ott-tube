@@ -3,6 +3,7 @@ import Card from "../../components/ui/Card";
 import Table from "../../components/ui/Table";
 import RevenueChart from "../../components/charts/RevenueChart";
 import SalesChart from "../../components/charts/SalesChart";
+import Dropdown from "../../components/ui/Dropdown";
 import { formatCurrency } from "../../utils/formatCurrency";
 import { formatDate } from "../../utils/formatDate";
 import useAnimatedCounter from "../../hooks/useAnimatedCounter";
@@ -51,17 +52,15 @@ const Dashboard = () => {
     <div className="space-y-8">
       {/* Date Filter */}
       <div className="flex justify-end">
-        <select
+        <Dropdown
           value={dateRange}
-          onChange={(e) =>
-            setDateRange(e.target.value)
-          }
-          className="border border-gray-300 dark:border-gray-700 px-4 py-2 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-        >
-          <option value="7d">Last 7 Days</option>
-          <option value="30d">Last 30 Days</option>
-          <option value="1y">Last 1 Year</option>
-        </select>
+          onChange={setDateRange}
+          options={[
+            { value: "7d", label: "Last 7 Days" },
+            { value: "30d", label: "Last 30 Days" },
+            { value: "1y", label: "Last 1 Year" },
+          ]}
+        />
       </div>
 
       {/* KPI Section */}
@@ -105,9 +104,9 @@ const Dashboard = () => {
             Top 5 Movies
           </h3>
           <ul className="space-y-3">
-            {topMovies.map((movie, index) => (
+            {topMovies.map((movie) => (
               <li
-                key={index}
+                key={movie.title}
                 className="flex justify-between"
               >
                 <span>{movie.title}</span>

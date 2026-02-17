@@ -15,7 +15,7 @@ const Card = ({
   return (
     <div
       className={clsx(
-        "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl transition-colors",
+        "card-surface rounded-xl text-[var(--text-primary)] transition-colors",
         padding && "p-6",
         shadowMap[shadow],
         className

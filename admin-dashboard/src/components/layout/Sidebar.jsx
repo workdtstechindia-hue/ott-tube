@@ -60,7 +60,7 @@ const Sidebar = ({
       <aside
         className={`
           fixed z-40 lg:static
-          top-0 left-0 h-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-md dark:shadow-gray-900/40
+          top-0 left-0 h-full glass-surface border-r border-[var(--border-color)] text-[var(--text-primary)] shadow-md
           transition-all duration-300
           ${isCollapsed ? "w-20" : "w-64"}
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
@@ -68,20 +68,22 @@ const Sidebar = ({
         `}
         aria-label="Sidebar Navigation"
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between border-b border-[var(--border-color)] p-4">
           {!isCollapsed && (
-            <h1 className="text-lg font-semibold">Movie Admin</h1>
+            <h1 className="text-lg font-semibold tracking-tight">
+              OTT Admin
+            </h1>
           )}
           <button
             onClick={toggleCollapse}
-            className="hidden lg:block"
+            className="hidden rounded-lg p-1.5 transition hover:bg-black/5 dark:hover:bg-white/10 lg:block"
             aria-label="Toggle Sidebar Collapse"
           >
-            <Bars3Icon className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+            <Bars3Icon className="h-6 w-6 text-[var(--text-muted)]" />
           </button>
         </div>
 
-        <nav className="mt-4 space-y-1">
+        <nav className="mt-4 space-y-1 px-2">
           {navItems.filter((item) => hasPermission(item.permission)).map((item) => {
             const Icon = item.icon;
 
@@ -92,13 +94,14 @@ const Sidebar = ({
                 end={item.path === "/"}
                 className={({ isActive }) =>
                   `
-                  flex items-center gap-3 px-4 py-3 text-sm font-medium
-                  transition-all duration-200
+                  relative flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200
                   ${
                     isActive
-                      ? "bg-gray-100 dark:bg-gray-800 text-blue-600 dark:text-blue-400"
-                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/70"
+                      ? "bg-gradient-to-r from-blue-500/15 to-cyan-400/10 text-blue-600 dark:text-blue-300"
+                      : "text-[var(--text-muted)] hover:bg-black/5 hover:text-[var(--text-primary)] dark:hover:bg-white/10"
                   }
+                  before:absolute before:bottom-2 before:left-1 before:top-2 before:w-1 before:rounded-full before:bg-blue-500 before:transition-opacity
+                  ${isActive ? "before:opacity-100" : "before:opacity-0"}
                 `
                 }
                 onClick={handleNavClick}

@@ -1,21 +1,16 @@
 import axios from "axios";
-import { tokenService } from "./tokenService";
+import { tokenService } from "../services/tokenService";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-
-const axiosInstance = axios.create({
-  baseURL: API_BASE_URL,
+const api = axios.create({
+  baseURL: "https://ott-tube-backend.onrender.com/",
+  timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
   withCredentials: false,
 });
 
-/* =========================
-   REQUEST INTERCEPTOR
-========================= */
-axiosInstance.interceptors.request.use(
+api.interceptors.request.use(
   (config) => {
     const token = tokenService.getToken();
 
@@ -23,7 +18,6 @@ axiosInstance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // If sending FormData (movie upload/update)
     if (config.data instanceof FormData) {
       config.headers["Content-Type"] = "multipart/form-data";
     }
@@ -33,26 +27,30 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-/* =========================
-   RESPONSE INTERCEPTOR
-========================= */
-axiosInstance.interceptors.response.use(
+api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status;
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Something went wrong. Please try again.";
 
     if (status === 401 || status === 403) {
-      // Auto logout
       tokenService.clearAll();
-
-      // Redirect to login
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
     }
 
-    return Promise.reject(error);
+    window.dispatchEvent(
+      new CustomEvent("api:error", {
+        detail: { message, status },
+      })
+    );
+
+    return Promise.reject({ ...error, friendlyMessage: message });
   }
 );
 
-export default axiosInstance;
+export default api;

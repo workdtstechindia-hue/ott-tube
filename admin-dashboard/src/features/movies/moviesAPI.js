@@ -1,34 +1,36 @@
-import axiosInstance from "../../services/axiosInstance";
+import api from "../../api/axios";
 
 export const moviesAPI = {
   getAll: async () => {
-    const res = await axiosInstance.get("/api/admin/movies");
+    const res = await api.get("/api/admin/movies");
     return res.data;
   },
 
   getById: async (id) => {
-    const res = await axiosInstance.get(`/api/admin/movies/${id}`);
+    const res = await api.get(`/api/admin/movies/${id}`);
     return res.data;
   },
 
-  create: async (formData) => {
-    const res = await axiosInstance.post(
+  create: async (formData, config = {}) => {
+    const res = await api.post(
       "/api/admin/movies",
-      formData
+      formData,
+      config
     );
     return res.data;
   },
 
-  update: async (id, formData) => {
-    const res = await axiosInstance.put(
+  update: async (id, formData, config = {}) => {
+    const res = await api.put(
       `/api/admin/movies/${id}`,
-      formData
+      formData,
+      config
     );
     return res.data;
   },
 
   delete: async (id) => {
-    const res = await axiosInstance.delete(
+    const res = await api.delete(
       `/api/admin/movies/${id}`
     );
     return res.data;

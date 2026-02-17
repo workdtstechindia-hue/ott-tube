@@ -11,8 +11,8 @@ import {
 
 const RevenueChart = ({ data = [], title = "Revenue Overview" }) => {
   return (
-    <div className="bg-white dark:bg-gray-900 shadow-md dark:shadow-gray-900/40 rounded-xl p-6 transition-colors">
-      <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-6">
+    <div className="card-surface rounded-xl p-6 transition-colors">
+      <h3 className="mb-6 text-lg font-semibold text-[var(--text-primary)]">
         {title}
       </h3>
 

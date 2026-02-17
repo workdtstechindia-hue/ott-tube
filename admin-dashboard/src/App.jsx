@@ -1,13 +1,19 @@
 import { BrowserRouter } from "react-router-dom";
 import AppRoutes from "./app/routes";
 import { ThemeProvider } from "./context/ThemeContext";
+import ErrorBoundary from "./components/common/ErrorBoundary";
+import { ToastProvider } from "./components/ui/ToastProvider";
 
 function App() {
   return (
     <BrowserRouter>
-      <ThemeProvider>
-        <AppRoutes />
-      </ThemeProvider>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <ToastProvider>
+            <AppRoutes />
+          </ToastProvider>
+        </ThemeProvider>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

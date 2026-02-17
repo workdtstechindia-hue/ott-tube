@@ -45,13 +45,13 @@ const Table = ({
 
   return (
     <div className={clsx("overflow-x-auto", className)}>
-      <table className="w-full text-sm text-gray-800 dark:text-gray-200">
-        <thead className="bg-gray-50 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300">
+      <table className="table-surface w-full text-sm text-[var(--text-primary)]">
+        <thead className="table-head">
           <tr>
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="p-4 cursor-pointer"
+                className="cursor-pointer px-5 py-4 text-center align-middle"
                 onClick={() =>
                   col.sortable && handleSort(col.key)
                 }
@@ -65,11 +65,11 @@ const Table = ({
         <tbody>
           {paginated.map((row, i) => (
             <tr
-              key={i}
-              className="border-t border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition"
+              key={row.id || row._id || `row-${i}`}
+              className="table-row h-14 transition"
             >
               {columns.map((col) => (
-                <td key={col.key} className="p-4">
+                <td key={col.key} className="px-5 py-4 text-center align-middle">
                   {col.render
                     ? col.render(row)
                     : row[col.key]}
