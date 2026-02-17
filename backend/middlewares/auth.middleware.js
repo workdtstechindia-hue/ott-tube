@@ -1,7 +1,9 @@
 const User = require("../models/user.model");
-const Admin = require("../models/admin.model");
 const ApiError = require("../utils/ApiError");
 const { verifyToken } = require("../utils/jwt");
+const env = require("../config/env");
+
+const isJwtError = (error) => error && (error.name === "TokenExpiredError" || error.name === "JsonWebTokenError");
 
 const authenticate = async (req, res, next) => {
   try {
@@ -12,16 +14,39 @@ const authenticate = async (req, res, next) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = verifyToken(token);
+    let decoded;
 
-    const accountModel = decoded.role === "admin" ? Admin : User;
-    const user = await accountModel.findById(decoded.id).select("_id name email role isActive");
+    try {
+      decoded = verifyToken(token);
+    } catch (error) {
+      if (isJwtError(error)) {
+        return next(new ApiError(401, "Invalid or expired token"));
+      }
+      return next(error);
+    }
+
+    if (decoded.role === "admin") {
+      req.user = {
+        id: "admin",
+        email: String(env.adminEmail || "").trim().toLowerCase(),
+        role: "admin",
+        name: String(decoded.name || env.adminName || "Admin").trim(),
+      };
+
+      return next();
+    }
+
+    if (decoded.role !== "user") {
+      return next(new ApiError(401, "Invalid or expired token"));
+    }
+
+    const user = await User.findById(decoded.id).select("_id name email role isActive").lean().exec();
     if (!user || !user.isActive) {
       return next(new ApiError(401, "User not found or inactive"));
     }
 
     req.user = {
-      id: user._id.toString(),
+      id: String(user._id),
       email: user.email,
       role: user.role,
       name: user.name,
@@ -29,7 +54,7 @@ const authenticate = async (req, res, next) => {
 
     return next();
   } catch (error) {
-    return next(new ApiError(401, "Invalid or expired token"));
+    return next(error);
   }
 };
 

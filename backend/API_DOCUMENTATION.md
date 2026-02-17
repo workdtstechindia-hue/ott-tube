@@ -57,7 +57,7 @@ Response `200`:
 ### POST `/api/auth/register`
 
 Purpose:
-- Register a normal user account.
+- Register a normal user account and auto-login immediately.
 
 Body:
 ```json
@@ -68,11 +68,11 @@ Body:
 }
 ```
 
-Response `201`:
+Response `200`:
 ```json
 {
   "success": true,
-  "message": "Registered successfully",
+  "message": "Login successful",
   "data": {
     "user": {
       "id": "USER_ID",
@@ -84,6 +84,10 @@ Response `201`:
   }
 }
 ```
+
+Notes:
+- Response structure matches `/api/auth/login` exactly.
+- Token is returned immediately after successful registration.
 
 ### POST `/api/auth/login`
 
@@ -142,6 +146,44 @@ Response `200`:
     },
     "token": "JWT_TOKEN"
   }
+}
+```
+
+### GET `/api/auth/me`
+
+Purpose:
+- Return authenticated account profile data for logged-in user/admin.
+
+Headers:
+- `Authorization: Bearer <JWT_TOKEN>`
+
+Response `200`:
+```json
+{
+  "success": true,
+  "message": "Profile fetched successfully",
+  "data": {
+    "id": "USER_OR_ADMIN_ID",
+    "name": "John Doe",
+    "email": "john@mail.com",
+    "role": "user"
+  }
+}
+```
+
+Error `401` (missing/invalid/expired token):
+```json
+{
+  "success": false,
+  "message": "Invalid or expired token"
+}
+```
+
+Error `404` (token valid but account no longer exists):
+```json
+{
+  "success": false,
+  "message": "User not found"
 }
 ```
 

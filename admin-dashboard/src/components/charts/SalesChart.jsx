@@ -16,9 +16,9 @@ const SalesChart = ({ data = [], title = "Sales Analytics" }) => {
         {title}
       </h3>
 
-      <div className="w-full h-[320px]">
+      <div className="h-[240px] w-full sm:h-[320px]">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data}>
+          <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 8 }}>
             <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 3" />
 
             <XAxis

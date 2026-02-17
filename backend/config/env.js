@@ -1,7 +1,8 @@
 const path = require("path");
 const dotenv = require("dotenv");
 
-dotenv.config({ path: path.resolve(process.cwd(), ".env") });
+// Always resolve backend/.env regardless of where the process is started.
+dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 
 const requiredKeys = [
   "PORT",

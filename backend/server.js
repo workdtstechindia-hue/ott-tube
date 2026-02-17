@@ -4,28 +4,63 @@ const http = require("http");
 const app = require("./app");
 const env = require("./config/env");
 const { connectDB } = require("./config/db");
-const { seedAdminUser } = require("./services/admin.service");
 const { startExpiryCleanupJob } = require("./utils/cleanupExpiredAccess");
+
+let server;
+let dbConnection;
+let isShuttingDown = false;
+
+const shutdown = async (signal, error) => {
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+
+  if (error) {
+    console.error(`[${signal}]`, error);
+  }
+
+  try {
+    if (server) {
+      await new Promise((resolve) => server.close(resolve));
+    }
+
+    if (dbConnection) {
+      await dbConnection.disconnect();
+    }
+  } finally {
+    process.exit(error ? 1 : 0);
+  }
+};
+
+process.on("unhandledRejection", (reason) => {
+  shutdown("unhandledRejection", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  shutdown("uncaughtException", error);
+});
+
+process.on("SIGTERM", () => {
+  shutdown("SIGTERM");
+});
+
+process.on("SIGINT", () => {
+  shutdown("SIGINT");
+});
 
 const startServer = async () => {
   try {
-    const connection = await connectDB();
-    console.log(`MongoDB connected to database: ${connection.connection.name}`);
+    dbConnection = await connectDB();
+    console.log(`MongoDB connected to database: ${dbConnection.connection.name}`);
 
-    await seedAdminUser();
-
-    const server = http.createServer(app);
+    server = http.createServer(app);
 
     server.listen(env.port, () => {
       console.log(`Server running on port ${env.port}`);
     });
 
     startExpiryCleanupJob();
-
-    process.on("SIGTERM", async () => {
-      await connection.disconnect();
-      server.close(() => process.exit(0));
-    });
   } catch (error) {
     console.error("Startup failed:", error.message);
     process.exit(1);

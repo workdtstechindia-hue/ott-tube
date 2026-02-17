@@ -10,6 +10,9 @@ const {
   removeTempFile,
 } = require("../utils/cloudinaryMedia");
 
+const SYSTEM_ADMIN_OBJECT_ID = "000000000000000000000001";
+const resolveCreatorId = (reqUserId) => (reqUserId === "admin" ? SYSTEM_ADMIN_OBJECT_ID : reqUserId);
+
 const toMovieResponse = (movie, includeVideo = false) => ({
   id: movie._id,
   title: movie.title,
@@ -71,7 +74,7 @@ const uploadMovie = asyncHandler(async (req, res) => {
         publicId: uploadedVideo.public_id,
         resourceType: "video",
       },
-      createdBy: req.user.id,
+      createdBy: resolveCreatorId(req.user.id),
     });
 
     res.status(201).json({

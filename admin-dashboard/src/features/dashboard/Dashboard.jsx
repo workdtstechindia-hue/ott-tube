@@ -49,7 +49,7 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {/* Date Filter */}
       <div className="flex justify-end">
         <Dropdown
@@ -64,12 +64,12 @@ const Dashboard = () => {
       </div>
 
       {/* KPI Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6">
         <Card>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Total Revenue
           </p>
-          <p className="text-3xl font-bold">
+          <p className="text-2xl font-bold sm:text-3xl">
             {formatCurrency(animatedRevenue)}
           </p>
         </Card>
@@ -78,14 +78,14 @@ const Dashboard = () => {
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Total Purchases
           </p>
-          <p className="text-3xl font-bold">
+          <p className="text-2xl font-bold sm:text-3xl">
             {animatedPurchases}
           </p>
         </Card>
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
         <RevenueChart
           data={chartData}
           title="Revenue Trend"
@@ -97,10 +97,10 @@ const Dashboard = () => {
       </div>
 
       {/* Bottom Analytics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
         {/* Top Movies */}
         <Card>
-          <h3 className="text-lg font-semibold mb-4">
+          <h3 className="mb-4 text-base font-semibold sm:text-lg">
             Top 5 Movies
           </h3>
           <ul className="space-y-3">
@@ -109,7 +109,7 @@ const Dashboard = () => {
                 key={movie.title}
                 className="flex justify-between"
               >
-                <span>{movie.title}</span>
+                <span className="truncate">{movie.title}</span>
                 <span className="font-medium">
                   {movie.purchases}
                 </span>
@@ -120,7 +120,7 @@ const Dashboard = () => {
 
         {/* Recent Transactions */}
         <Card>
-          <h3 className="text-lg font-semibold mb-4">
+          <h3 className="mb-4 text-base font-semibold sm:text-lg">
             Recent Transactions
           </h3>
 

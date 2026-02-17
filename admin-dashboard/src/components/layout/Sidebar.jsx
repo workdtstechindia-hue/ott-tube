@@ -52,12 +52,14 @@ const Sidebar = ({
       {/* Mobile Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-30 z-30 lg:hidden"
+          className="fixed inset-0 z-30 bg-black/35 backdrop-blur-sm lg:hidden"
           onClick={toggleSidebar}
+          aria-hidden="true"
         />
       )}
 
       <aside
+        id="admin-sidebar"
         className={`
           fixed z-40 lg:static
           top-0 left-0 h-full glass-surface border-r border-[var(--border-color)] text-[var(--text-primary)] shadow-md
@@ -107,7 +109,7 @@ const Sidebar = ({
                 onClick={handleNavClick}
               >
                 <Icon className="w-5 h-5" />
-                {!isCollapsed && <span>{item.name}</span>}
+                <span className={isCollapsed ? "lg:hidden" : ""}>{item.name}</span>
               </NavLink>
             );
           })}

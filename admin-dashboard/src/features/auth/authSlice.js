@@ -64,6 +64,10 @@ const authSlice = createSlice({
     clearAuthError: (state) => {
       state.error = null;
     },
+    hydrateFromStorage: (state) => {
+      state.token = tokenService.getToken();
+      state.user = tokenService.getUser();
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -83,7 +87,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, setUser, clearAuthError } =
+export const { logout, setUser, clearAuthError, hydrateFromStorage } =
   authSlice.actions;
 
 export default authSlice.reducer;
