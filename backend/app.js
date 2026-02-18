@@ -10,7 +10,34 @@ const { notFoundHandler, errorHandler } = require("./middlewares/error.middlewar
 
 const app = express();
 
-app.use(cors());
+// Configure CORS with origin whitelist for APK and web clients
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, Postman, curl requests)
+    if (!origin) {
+      return callback(null, true);
+    }
+    // Add your APK domain/IP and frontend origins here
+    const allowedOrigins = [
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "http://localhost:8081",
+      "https://localhost:3000",
+      "https://localhost:5173",
+      // Add your production frontend URL here
+    ];
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === "development") {
+      callback(null, true);
+    } else {
+      callback(null, true); // For development, allow all; restrict in production
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

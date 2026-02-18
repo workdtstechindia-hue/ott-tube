@@ -29,36 +29,44 @@ const createOrder = asyncHandler(async (req, res) => {
     throw new ApiError(409, "You already rented this movie and your access is still active");
   }
 
-  const order = await razorpayClient.orders.create({
-    amount: Math.round(movie.price * 100),
-    currency: "INR",
-    receipt: `movie_${movie._id}_${Date.now()}`,
-    notes: {
-      userId: req.user.id,
-      movieId: movie._id.toString(),
-    },
-  });
+  try {
+    const order = await razorpayClient.orders.create({
+      amount: Math.round(movie.price * 100),
+      currency: "INR",
+      receipt: `movie_${movie._id}_${Date.now()}`,
+      notes: {
+        userId: req.user.id,
+        movieId: movie._id.toString(),
+      },
+    });
 
-  await Purchase.create({
-    user: req.user.id,
-    movie: movie._id,
-    amount: movie.price,
-    currency: "INR",
-    razorpayOrderId: order.id,
-    status: "pending",
-  });
+    await Purchase.create({
+      user: req.user.id,
+      movie: movie._id,
+      amount: movie.price,
+      currency: "INR",
+      razorpayOrderId: order.id,
+      status: "pending",
+    });
 
-  res.status(201).json({
-    success: true,
-    message: "Razorpay order created",
-    data: {
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      keyId: env.razorpayKeyId,
-      movieId: movie._id,
-    },
-  });
+    res.status(201).json({
+      success: true,
+      message: "Razorpay order created",
+      data: {
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId: env.razorpayKeyId,
+        movieId: movie._id,
+      },
+    });
+  } catch (razorpayError) {
+    console.error("[Razorpay API Error]", razorpayError);
+    throw new ApiError(
+      500,
+      "Failed to create payment order with Razorpay. Please verify API credentials and try again."
+    );
+  }
 });
 
 const verifyPayment = asyncHandler(async (req, res) => {
@@ -75,7 +83,8 @@ const verifyPayment = asyncHandler(async (req, res) => {
     .digest("hex");
 
   if (expectedSignature !== razorpay_signature) {
-    throw new ApiError(400, "Invalid payment signature");
+    console.error(`[Payment Verify Error] Signature mismatch - Expected: ${expectedSignature}, Got: ${razorpay_signature}`);
+    throw new ApiError(400, "Invalid payment signature. Signature verification failed.");
   }
 
   const purchase = await Purchase.findOne({
@@ -84,11 +93,21 @@ const verifyPayment = asyncHandler(async (req, res) => {
   });
 
   if (!purchase) {
-    throw new ApiError(404, "Order not found for current user");
+    console.error(`[Payment Verify Error] Purchase not found - Order: ${razorpay_order_id}, User: ${req.user.id}`);
+    throw new ApiError(404, "Order not found for current user. Please contact support.");
   }
 
   if (purchase.status === "paid") {
-    throw new ApiError(409, "Payment already verified for this order");
+    return res.status(200).json({
+      success: true,
+      message: "Payment already verified",
+      data: {
+        purchaseId: purchase._id,
+        movieId: purchase.movie,
+        accessExpiresAt: purchase.accessExpiresAt,
+        watchLink: `/api/user/watch/${purchase.movie}`,
+      },
+    });
   }
 
   const existingPayment = await Purchase.findOne({
@@ -96,7 +115,8 @@ const verifyPayment = asyncHandler(async (req, res) => {
     status: "paid",
   });
   if (existingPayment) {
-    throw new ApiError(409, "Duplicate payment detected");
+    console.warn(`[Payment Verify Warning] Duplicate payment attempt - Payment ID: ${razorpay_payment_id}`);
+    throw new ApiError(409, "Duplicate payment detected for this payment ID.");
   }
 
   purchase.razorpayPaymentId = razorpay_payment_id;
@@ -119,4 +139,35 @@ const verifyPayment = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { createOrder, verifyPayment };
+const getOrderStatus = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+
+  if (!orderId) {
+    throw new ApiError(400, "orderId is required");
+  }
+
+  const purchase = await Purchase.findOne({
+    razorpayOrderId: orderId,
+    user: req.user.id,
+  });
+
+  if (!purchase) {
+    throw new ApiError(404, "Order not found");
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Order status retrieved",
+    data: {
+      orderId: purchase.razorpayOrderId,
+      paymentId: purchase.razorpayPaymentId || null,
+      status: purchase.status,
+      amount: purchase.amount,
+      currency: purchase.currency,
+      paidAt: purchase.paidAt,
+      accessExpiresAt: purchase.accessExpiresAt,
+    },
+  });
+});
+
+module.exports = { createOrder, verifyPayment, getOrderStatus };
