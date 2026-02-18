@@ -104,7 +104,7 @@ const UserList = () => {
             No users found.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto px-2 pb-2 md:px-0 md:pb-0">
             <table className="table-surface w-full text-sm">
               <thead className="table-head">
                 <tr>

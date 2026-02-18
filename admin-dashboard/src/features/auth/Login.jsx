@@ -38,13 +38,13 @@ const Login = () => {
   }, [token, navigate, location.state]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4 transition-colors duration-300">
-      <div className="w-full max-w-md bg-white dark:bg-gray-800 shadow-xl rounded-xl p-8 transition-colors duration-300">
+    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-3 sm:px-4 transition-colors duration-300">
+      <div className="w-full max-w-md bg-white dark:bg-gray-800 shadow-xl rounded-xl p-5 sm:p-8 transition-colors duration-300">
         
         {/* Header */}
-        <div className="text-center mb-6">
+        <div className="mb-5 text-center sm:mb-6">
           <div className="w-14 h-14 mx-auto bg-gray-900 dark:bg-white rounded-xl mb-3"></div>
-          <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white sm:text-2xl">
             Admin Login
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">

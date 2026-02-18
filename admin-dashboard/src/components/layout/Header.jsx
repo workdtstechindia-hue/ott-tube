@@ -17,16 +17,22 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
   };
 
   return (
-    <header className="glass-surface min-h-[72px] shrink-0 border-b border-[var(--border-color)] px-6 py-4 transition-[background,color] duration-300 flex items-center justify-between">
-      <button
-        onClick={toggleSidebar}
-        className="rounded-lg p-1.5 transition hover:bg-black/5 dark:hover:bg-white/10 lg:hidden"
-        aria-label="Open Sidebar"
-      >
-        <Bars3Icon className="h-6 w-6 text-[var(--text-primary)]" />
-      </button>
+    <header className="relative glass-surface min-h-[64px] shrink-0 border-b border-[var(--border-color)] px-3 py-3 sm:min-h-[72px] sm:px-6 sm:py-4 transition-[background,color] duration-300 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={toggleSidebar}
+          className="rounded-lg p-1.5 transition hover:bg-black/5 dark:hover:bg-white/10 lg:hidden"
+          aria-label="Open Sidebar"
+        >
+          <Bars3Icon className="h-6 w-6 text-[var(--text-primary)]" />
+        </button>
 
-      <div className="ml-auto flex items-center gap-4">
+        <h1 className="text-sm font-semibold tracking-wide text-[var(--text-primary)] lg:hidden truncate max-w-[55vw] flex-shrink-0 pointer-events-none">
+          OTT Admin
+        </h1>
+      </div>
+
+      <div className="flex items-center gap-2 sm:gap-4">
         <button
           onClick={toggleTheme}
           className="glass-surface rounded-xl p-2 transition hover:scale-105 hover:bg-black/5 dark:hover:bg-white/10"
@@ -57,7 +63,7 @@ const Header = ({ toggleSidebar, isSidebarOpen }) => {
 
         <button
           onClick={handleLogout}
-          className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-500/20 dark:text-red-300"
+          className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-500/20 sm:px-4 sm:py-2 sm:text-sm dark:text-red-300"
         >
           Logout
         </button>

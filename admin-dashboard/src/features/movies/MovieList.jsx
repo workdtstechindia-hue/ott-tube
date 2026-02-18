@@ -6,6 +6,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Modal from "../../components/ui/Modal";
+import Button from "../../components/ui/Button";
 import SearchBar from "../../components/ui/SearchBar";
 import Skeleton from "../../components/ui/Skeleton";
 import { useToast } from "../../components/ui/ToastProvider";
@@ -13,32 +15,50 @@ import { moviesAPI } from "./moviesAPI";
 
 const MovieRow = memo(function MovieRow({ movie, onEdit, onDelete }) {
   return (
-    <tr className="table-row h-14 transition">
-      <td className="px-5 py-4 text-center align-middle">
-        <img
-          src={movie.coverImageUrl}
-          alt={movie.title}
-          loading="lazy"
-          className="mx-auto h-12 w-10 rounded-md object-cover"
-        />
+    <tr className="table-row block rounded-xl border border-[var(--border-color)] p-4 transition hover:bg-[var(--table-row-hover)] md:table-row md:h-14 md:rounded-none md:border-0 md:p-0">
+      <td className="block text-left align-middle md:table-cell md:px-5 md:py-4 md:text-center">
+        <div className="w-full max-w-full overflow-hidden rounded-lg md:mx-auto">
+          <img
+            src={movie.coverImageUrl}
+            alt={movie.title}
+            loading="lazy"
+            className="w-full h-auto rounded-lg object-cover max-h-48"
+          />
+        </div>
       </td>
-      <td className="max-w-[280px] px-5 py-4 text-center align-middle font-medium text-[var(--text-primary)]">
-        <p className="truncate">{movie.title}</p>
+      <td className="block max-w-none px-4 py-2 text-left align-middle font-medium text-[var(--text-primary)] md:table-cell md:max-w-[280px] md:px-5 md:py-4 md:text-center">
+        <span className="mb-1 block text-xs uppercase tracking-wide text-[var(--text-muted)] md:hidden">
+          Title
+        </span>
+        <p className="whitespace-normal break-words md:truncate">{movie.title}</p>
       </td>
-      <td className="max-w-[260px] px-5 py-4 text-center align-middle text-[var(--text-muted)]">
-        <p className="truncate">{movie.actors?.join(", ") || "-"}</p>
+      <td className="block max-w-none px-4 py-2 text-left align-middle text-[var(--text-muted)] md:table-cell md:max-w-[260px] md:px-5 md:py-4 md:text-center">
+        <span className="mb-1 block text-xs uppercase tracking-wide text-[var(--text-muted)] md:hidden">
+          Actors
+        </span>
+        <p className="whitespace-normal break-words md:truncate">{movie.actors?.join(", ") || "-"}</p>
       </td>
-      <td className="w-28 px-5 py-4 text-center align-middle">{movie.rating || "-"}</td>
-      <td className="w-28 px-5 py-4 text-center align-middle">Rs. {movie.price}</td>
-      <td className="w-40 px-5 py-4 text-center align-middle text-[var(--text-muted)]">
+      <td className="block w-auto px-4 py-2 text-left align-middle md:table-cell md:w-28 md:px-5 md:py-4 md:text-center">
+        <span className="mb-1 block text-xs uppercase tracking-wide text-[var(--text-muted)] md:hidden">
+          Rating
+        </span>
+        {movie.rating || "-"}
+      </td>
+      <td className="block w-auto px-4 py-2 text-left align-middle md:table-cell md:w-28 md:px-5 md:py-4 md:text-center">
+        <span className="mb-1 block text-xs uppercase tracking-wide text-[var(--text-muted)] md:hidden">
+          Price
+        </span>
+        Rs. {movie.price}
+      </td>
+      <td className="hidden w-40 px-5 py-4 text-center align-middle text-[var(--text-muted)] md:table-cell">
         {new Date(movie.createdAt).toLocaleDateString()}
       </td>
-      <td className="w-32 px-5 py-4 text-center align-middle">
-        <div className="flex items-center justify-center gap-2">
+      <td className="block w-auto px-4 pt-3 text-left align-middle md:table-cell md:w-32 md:px-5 md:py-4 md:text-center">
+        <div className="grid grid-cols-2 gap-2 md:flex md:items-center md:justify-center md:gap-2">
           <button
             type="button"
             onClick={() => onEdit(movie.id)}
-            className="rounded-lg border border-[var(--border-color)] p-2 text-blue-600 transition hover:bg-blue-500/10"
+            className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--border-color)] p-2 text-blue-600 transition hover:bg-blue-500/10 md:w-auto"
             aria-label={`Edit ${movie.title}`}
           >
             <PencilSquareIcon className="h-4 w-4" />
@@ -46,7 +66,7 @@ const MovieRow = memo(function MovieRow({ movie, onEdit, onDelete }) {
           <button
             type="button"
             onClick={() => onDelete(movie.id)}
-            className="rounded-lg border border-[var(--border-color)] p-2 text-red-600 transition hover:bg-red-500/10"
+            className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--border-color)] p-2 text-red-600 transition hover:bg-red-500/10 md:w-auto"
             aria-label={`Delete ${movie.title}`}
           >
             <TrashIcon className="h-4 w-4" />
@@ -61,6 +81,8 @@ const MovieList = () => {
   const [movies, setMovies] = useState([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [movieToDelete, setMovieToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
   const toast = useToast();
 
@@ -79,17 +101,29 @@ const MovieList = () => {
     fetchMovies();
   }, [fetchMovies]);
 
-  const handleDelete = useCallback(
-    async (id) => {
-      if (!window.confirm("Delete this movie?")) return;
+  const handleDeleteClick = useCallback((movie) => {
+    setMovieToDelete(movie);
+  }, []);
 
-      const res = await moviesAPI.delete(id);
-      if (res.success) {
-        toast.success("Movie deleted");
-        fetchMovies();
+  const handleDeleteConfirm = useCallback(
+    async (id) => {
+      if (!id || deleting) return;
+
+      try {
+        setDeleting(true);
+        const res = await moviesAPI.delete(id);
+        if (res.success) {
+          toast.success("Movie deleted");
+          setMovieToDelete(null);
+          fetchMovies();
+        }
+      } catch (error) {
+        toast.error(error?.friendlyMessage || "Failed to delete movie");
+      } finally {
+        setDeleting(false);
       }
     },
-    [fetchMovies, toast]
+    [deleting, fetchMovies, toast]
   );
 
   const filteredMovies = useMemo(() => {
@@ -115,8 +149,8 @@ const MovieList = () => {
   }
 
   return (
-    <section className="space-y-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className="space-y-4 md:space-y-6">
+      <header className="grid grid-cols-1 gap-4 md:flex md:items-center md:justify-between">
         <SearchBar
           value={search}
           onSearch={setSearch}
@@ -125,7 +159,7 @@ const MovieList = () => {
         <button
           type="button"
           onClick={() => navigate("/movies/create")}
-          className="inline-flex items-center justify-center gap-2 self-start rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-gray-800"
+          className="inline-flex w-full min-h-11 items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-gray-800 md:w-auto md:self-start"
         >
           <PlusIcon className="h-5 w-5" />
           Add Movie
@@ -154,9 +188,9 @@ const MovieList = () => {
             </div>
           </div>
         ) : (
-          <div className="max-h-[560px] overflow-auto">
-            <table className="table-surface min-w-[900px] w-full table-fixed text-sm">
-              <thead className="table-head sticky top-0 z-10 bg-[var(--table-bg)] text-xs uppercase tracking-wide">
+          <div className="max-h-[560px] overflow-y-auto px-3 py-3 md:px-0 md:py-0">
+            <table className="movie-table-mobile table-surface w-full text-sm md:min-w-[900px] md:table-fixed">
+              <thead className="table-head sticky top-0 z-10 hidden bg-[var(--table-bg)] text-xs uppercase tracking-wide md:table-header-group">
                 <tr className="h-14">
                   <th className="w-20 px-5 py-4 text-center align-middle">Cover</th>
                   <th className="px-5 py-4 text-center align-middle">Title</th>
@@ -167,13 +201,13 @@ const MovieList = () => {
                   <th className="w-32 px-5 py-4 text-center align-middle">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="block space-y-4 md:table-row-group md:space-y-0">
                 {filteredMovies.map((movie) => (
                   <MovieRow
                     key={movie.id}
                     movie={movie}
                     onEdit={(id) => navigate(`/movies/${id}/edit`)}
-                    onDelete={handleDelete}
+                    onDelete={() => handleDeleteClick(movie)}
                   />
                 ))}
               </tbody>
@@ -181,6 +215,43 @@ const MovieList = () => {
           </div>
         )}
       </div>
+
+      <Modal
+        isOpen={Boolean(movieToDelete)}
+        onClose={() => {
+          if (!deleting) setMovieToDelete(null);
+        }}
+        className="max-w-md rounded-2xl border border-[var(--border-color)] bg-[var(--card-bg)] p-6"
+      >
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+            Delete Movie
+          </h3>
+          <p className="text-sm text-[var(--text-muted)]">
+            Are you sure you want to delete{" "}
+            <span className="font-medium text-[var(--text-primary)]">
+              {movieToDelete?.title}
+            </span>
+            ? This action cannot be undone.
+          </p>
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => setMovieToDelete(null)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => handleDeleteConfirm(movieToDelete?.id)}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </section>
   );
 };

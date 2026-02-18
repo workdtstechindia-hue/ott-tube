@@ -123,7 +123,7 @@ const PurchaseList = () => {
         {paginated.length === 0 ? (
           <div className="p-10 text-center text-[var(--text-muted)]">No purchases found.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto px-2 pb-2 md:px-0 md:pb-0">
             <table className="table-surface w-full text-sm">
               <thead className="table-head">
                 <tr>

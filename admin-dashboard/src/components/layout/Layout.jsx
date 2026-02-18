@@ -19,7 +19,7 @@ const Layout = () => {
   }, [isSidebarOpen]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors">
+    <div className="flex min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors">
       <Sidebar
         isOpen={isSidebarOpen}
         isCollapsed={isCollapsed}
@@ -27,11 +27,11 @@ const Layout = () => {
         toggleCollapse={toggleCollapse}
       />
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <Header toggleSidebar={toggleSidebar} />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="card-surface min-h-full rounded-2xl p-6 app-ease">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
+          <div className="card-surface min-h-full rounded-xl p-4 sm:rounded-2xl sm:p-6 app-ease">
             <Outlet />
           </div>
         </main>

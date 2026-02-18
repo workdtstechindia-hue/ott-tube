@@ -61,12 +61,12 @@ const Sidebar = ({
       <aside
         id="admin-sidebar"
         className={`
-          fixed z-40 lg:static
-          top-0 left-0 h-full glass-surface border-r border-[var(--border-color)] text-[var(--text-primary)] shadow-md
+          fixed z-40 top-0 left-0 h-screen w-64 max-w-[85vw] glass-surface border-r border-[var(--border-color)] text-[var(--text-primary)] shadow-md flex flex-col
           transition-all duration-300
-          ${isCollapsed ? "w-20" : "w-64"}
+          ${isCollapsed ? "lg:w-20" : "lg:w-64"}
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0
+          lg:sticky lg:top-0 lg:h-auto lg:min-h-screen lg:translate-x-0
+          lg:overflow-visible
         `}
         aria-label="Sidebar Navigation"
       >
@@ -85,7 +85,8 @@ const Sidebar = ({
           </button>
         </div>
 
-        <nav className="mt-4 space-y-1 px-2">
+        <div className="flex-1 overflow-y-auto mt-4 px-2 py-3">
+          <nav className="space-y-1">
           {navItems.filter((item) => hasPermission(item.permission)).map((item) => {
             const Icon = item.icon;
 
@@ -113,7 +114,8 @@ const Sidebar = ({
               </NavLink>
             );
           })}
-        </nav>
+          </nav>
+        </div>
       </aside>
     </>
   );
