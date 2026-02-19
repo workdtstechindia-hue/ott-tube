@@ -33,7 +33,7 @@ const Field = memo(function Field({
         onChange={onChange}
         required={required}
         placeholder=" "
-        className="peer h-12 w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 pt-4 text-sm text-[var(--text-primary)] outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-400/40"
+        className="peer h-12 w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 pt-4 text-sm text-[var(--text-primary)] outline-none transition duration-200 ease-in-out hover:shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-400/30 dark:focus:ring-blue-600/40"
       />
       <span className="pointer-events-none absolute left-3 top-3 origin-left bg-transparent px-1 text-xs text-[var(--text-muted)] transition peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-focus:top-1 peer-focus:text-xs peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:text-xs">
         {label}
@@ -535,7 +535,8 @@ const MovieForm = ({
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex min-w-40 items-center justify-center gap-2 rounded-xl bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-500"
+          className="inline-flex min-w-40 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition transform hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ transitionProperty: "transform, box-shadow" }}
         >
           {loading ? (
             <>

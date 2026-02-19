@@ -60,7 +60,7 @@ app.use("/api/categories", categoryRoutes);
 app.use("/api/tags", tagRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/user", userRoutes);}]}
+app.use("/api/user", userRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

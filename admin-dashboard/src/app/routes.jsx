@@ -53,6 +53,16 @@ const AppRoutes = () => {
             }
           />
           <Route path="movies/:id/edit" element={<MovieEdit />} />
+          {/* legacy/admin-prefixed routes for compatibility */}
+          <Route
+            path="admin/movies/create"
+            element={
+              <RoleGuard permission="MOVIE_MANAGE">
+                <MovieCreate />
+              </RoleGuard>
+            }
+          />
+          <Route path="admin/movies/edit/:id" element={<MovieEdit />} />
           <Route
             path="users"
             element={

@@ -50,3 +50,16 @@ const uploadMovieAssets = multer({
 ]);
 
 module.exports = { uploadMovieAssets };
+
+// simple avatar upload middleware (single image)
+const uploadAvatar = multer({
+  storage,
+  fileFilter: (req, file, cb) => {
+    const imageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    if (imageMimeTypes.has(file.mimetype)) return cb(null, true);
+    return cb(new ApiError(400, "Invalid avatar file type"));
+  },
+  limits: { fileSize: 5 * 1024 * 1024 },
+}).single("avatar");
+
+module.exports.uploadAvatar = uploadAvatar;

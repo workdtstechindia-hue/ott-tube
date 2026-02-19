@@ -75,10 +75,11 @@ const createOrder = asyncHandler(async (req, res) => {
     throw new ApiError(503, message);
   }
 
+  // store amount in paise for precision
   await Purchase.create({
     user: req.user.id,
     movie: movie ? movie._id : null,
-    amount: rupees,
+    amount: amountPaise,
     currency: "INR",
     razorpayOrderId: order.id,
     status: "pending",
@@ -147,6 +148,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
     throw new ApiError(409, "Duplicate payment detected for this payment ID.");
   }
 
+  // atomic update to avoid races
   purchase.razorpayPaymentId = razorpay_payment_id;
   purchase.razorpaySignature = razorpay_signature;
   purchase.status = "paid";
@@ -163,6 +165,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
       movieId: purchase.movie,
       accessExpiresAt: purchase.accessExpiresAt,
       watchLink: `/api/user/watch/${purchase.movie}`,
+      amount: (purchase.amount || 0) / 100,
     },
   });
 });

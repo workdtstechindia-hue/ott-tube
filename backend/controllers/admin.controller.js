@@ -268,10 +268,25 @@ const getAllPurchases = asyncHandler(async (req, res) => {
     .populate("movie", "title price")
     .sort({ createdAt: -1 });
 
+  // map to admin-friendly response
+  const mapped = purchases.map((p) => ({
+    id: p._id,
+    user: p.user ? { id: p.user._id, name: p.user.name, email: p.user.email } : null,
+    movie: p.movie ? { id: p.movie._id, title: p.movie.title } : null,
+    amount: (p.amount || 0) / 100,
+    currency: p.currency,
+    paymentStatus: p.status,
+    purchaseDate: p.paidAt || p.createdAt,
+    expiryDate: p.accessExpiresAt,
+    razorpayOrderId: p.razorpayOrderId,
+    razorpayPaymentId: p.razorpayPaymentId,
+    createdAt: p.createdAt,
+  }));
+
   res.status(200).json({
     success: true,
     message: "All purchases fetched",
-    data: purchases,
+    data: mapped,
   });
 });
 
@@ -285,14 +300,21 @@ const getDashboardOverview = asyncHandler(async (req, res) => {
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: "$amount" },
+          totalRevenuePaise: { $sum: "$amount" },
           paidTransactions: { $sum: 1 },
         },
       },
     ]),
   ]);
+  const revenue = paidSummary[0] || { totalRevenuePaise: 0, paidTransactions: 0 };
 
-  const revenue = paidSummary[0] || { totalRevenue: 0, paidTransactions: 0 };
+  // active / expired / failed counts
+  const now = new Date();
+  const [activeRentals, expiredRentals, failedPayments] = await Promise.all([
+    Purchase.countDocuments({ status: "paid", accessExpiresAt: { $gt: now } }),
+    Purchase.countDocuments({ $or: [ { status: "expired" }, { status: "paid", accessExpiresAt: { $lte: now } } ] }),
+    Purchase.countDocuments({ status: "failed" }),
+  ]);
 
   res.status(200).json({
     success: true,
@@ -301,8 +323,11 @@ const getDashboardOverview = asyncHandler(async (req, res) => {
       totalMovies: movieCount,
       totalUsers: userCount,
       totalPurchases: purchaseCount,
-      totalRevenue: revenue.totalRevenue,
+      totalRevenue: (Number(revenue.totalRevenuePaise || 0) / 100),
       paidTransactions: revenue.paidTransactions,
+      activeRentals,
+      expiredRentals,
+      failedPayments,
     },
   });
 });

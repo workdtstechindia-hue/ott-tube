@@ -34,6 +34,24 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    username: {
+      type: String,
+      trim: true,
+    },
+    phone: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    bio: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    avatar: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,

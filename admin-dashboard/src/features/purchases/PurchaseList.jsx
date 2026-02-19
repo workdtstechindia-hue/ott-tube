@@ -149,15 +149,27 @@ const PurchaseList = () => {
                     </td>
                     <td className="w-1/6 px-5 py-4 text-center align-middle">Rs. {item.amount}</td>
                     <td className="w-1/6 px-5 py-4 text-center align-middle">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${
-                          item.paymentStatus === "paid"
-                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
-                            : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                        }`}
-                      >
-                        {item.paymentStatus}
-                      </span>
+                      {(() => {
+                        const s = String((item.paymentStatus || "").toLowerCase());
+                        let label = item.paymentStatus || "Unknown";
+                        let classes = "rounded-full px-3 py-1 text-xs font-medium ";
+                        if (s === "paid") {
+                          label = "Payment Successful";
+                          classes += "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300";
+                        } else if (s === "failed") {
+                          label = "Payment Failed";
+                          classes += "bg-red-500/15 text-red-600 dark:text-red-300";
+                        } else if (s === "expired") {
+                          label = "Rental Expired";
+                          classes += "bg-gray-400/15 text-gray-600 dark:text-gray-300";
+                        } else {
+                          // pending/created/other
+                          label = "Order Created";
+                          classes += "bg-amber-500/15 text-amber-700 dark:text-amber-300";
+                        }
+
+                        return <span className={classes}>{label}</span>;
+                      })()}
                     </td>
                     <td className="w-1/6 px-5 py-4 text-center align-middle text-[var(--text-muted)]">
                       {new Date(item.purchasedAt).toLocaleDateString()}
