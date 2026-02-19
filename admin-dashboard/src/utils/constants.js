@@ -57,7 +57,10 @@ export const API_ENDPOINTS = {
     MOVIES: "/api/admin/movies",
     USERS: "/api/admin/users",
     PURCHASES: "/api/admin/purchases",
+    CATEGORIES: "/api/categories",
+    TAGS: "/api/tags",
   },
+
 };
 
 /* =========================

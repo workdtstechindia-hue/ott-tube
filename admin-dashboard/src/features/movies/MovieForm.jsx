@@ -6,6 +6,9 @@ import {
   VideoCameraIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
+import api from "../../api/axios";
+import { categoryAPI } from "./categoryAPI";
+import { tagAPI } from "./tagAPI";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -171,6 +174,16 @@ const MovieForm = ({
   const [isCoverDragging, setIsCoverDragging] = useState(false);
   const [isVideoDragging, setIsVideoDragging] = useState(false);
 
+  // categories / tags
+  const [categories, setCategories] = useState([]);
+  const [tagsList, setTagsList] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState(initialData?.category?.id || "");
+  const [selectedTags, setSelectedTags] = useState(
+    Array.isArray(initialData?.tags) ? initialData.tags.map((t) => t.id) : []
+  );
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newTagName, setNewTagName] = useState("");
+
   useEffect(() => {
     if (!initialData?.title) return;
     setForm({
@@ -183,6 +196,10 @@ const MovieForm = ({
         : initialData.actors || "",
     });
     setCoverPreview(initialData.coverImageUrl || null);
+    setSelectedCategory(initialData?.category?.id || "");
+    setSelectedTags(
+      Array.isArray(initialData?.tags) ? initialData.tags.map((t) => t.id) : []
+    );
   }, [initialData]);
 
   useEffect(() => {
@@ -192,6 +209,29 @@ const MovieForm = ({
       }
     };
   }, [coverPreview]);
+
+  // fetch categories and tags for dropdowns
+  useEffect(() => {
+    let cancelled = false;
+    const fetchLists = async () => {
+      try {
+        const [{ data: catResp }, { data: tagResp }] = await Promise.all([
+          categoryAPI.list(),
+          tagAPI.list(),
+        ]);
+        if (!cancelled) {
+          setCategories(catResp.data);
+          setTagsList(tagResp.data);
+        }
+      } catch (err) {
+        // ignore - admin page already authenticated
+      }
+    };
+    fetchLists();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const validateFile = useCallback((file, allowedTypes, maxSize, fieldName) => {
     if (!file) return null;
@@ -241,6 +281,30 @@ const MovieForm = ({
 
   const actorString = useMemo(() => form.actors.trim(), [form.actors]);
 
+  const handleAddCategory = useCallback(async () => {
+    if (!newCategoryName.trim()) return;
+    try {
+      const res = await categoryAPI.create(newCategoryName);
+      setCategories((prev) => [...prev, res.data]);
+      setSelectedCategory(res.data._id);
+      setNewCategoryName("");
+    } catch (err) {
+      console.error("category add failed", err);
+    }
+  }, [newCategoryName]);
+
+  const handleAddTag = useCallback(async () => {
+    if (!newTagName.trim()) return;
+    try {
+      const res = await tagAPI.create(newTagName);
+      setTagsList((prev) => [...prev, res.data]);
+      setSelectedTags((prev) => [...prev, res.data._id]);
+      setNewTagName("");
+    } catch (err) {
+      console.error("tag add failed", err);
+    }
+  }, [newTagName]);
+
   const validateForm = useCallback(() => {
     const nextErrors = {};
     if (!form.title.trim()) nextErrors.title = "Title is required";
@@ -268,6 +332,10 @@ const MovieForm = ({
         formData.append("price", String(form.price));
         if (form.rating) formData.append("rating", String(form.rating));
         if (actorString) formData.append("actors", actorString);
+        if (selectedCategory) formData.append("category", selectedCategory);
+        if (selectedTags.length) {
+          selectedTags.forEach((t) => formData.append("tags", t));
+        }
         if (coverFile) formData.append("cover", coverFile);
         if (videoFile) formData.append("video", videoFile);
 
@@ -320,6 +388,72 @@ const MovieForm = ({
             value={form.actors}
             onChange={handleChange}
           />
+
+          {/* category selection */}
+          <label className="block text-sm">
+            <span className="text-[var(--text-muted)]">Category</span>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="mt-1 block w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
+            >
+              <option value="">-- choose one --</option>
+              {categories.map((c) => (
+                <option key={c._id} value={c._id}> {c.name} </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="New category"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleAddCategory}
+              className="rounded-xl bg-blue-600 px-3 py-1 text-xs text-white"
+            >
+              Add
+            </button>
+          </div>
+
+          {/* tag multi-select */}
+          <label className="block text-sm">
+            <span className="text-[var(--text-muted)]">Tags</span>
+            <select
+              multiple
+              size={Math.min(5, tagsList.length || 5)}
+              value={selectedTags}
+              onChange={(e) => {
+                const opts = Array.from(e.target.selectedOptions).map((o) => o.value);
+                setSelectedTags(opts);
+              }}
+              className="mt-1 block w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
+            >
+              {tagsList.map((t) => (
+                <option key={t._id} value={t._id}> {t.name} </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="New tag"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleAddTag}
+              className="rounded-xl bg-blue-600 px-3 py-1 text-xs text-white"
+            >
+              Add
+            </button>
+          </div>
 
           <label className="relative block">
             <textarea

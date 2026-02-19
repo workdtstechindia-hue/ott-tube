@@ -92,6 +92,7 @@ Expected response:
 | Error | Root Cause | Solution |
 |-------|-----------|----------|
 | "Invalid payment signature" | Signature mismatch in verification | Ensure `RAZORPAY_KEY_SECRET` matches Razorpay dashboard |
+| "Missing env variable" | Server refused to start | Check `.env` for FRONTEND_URL, RAZORPAY_WEBHOOK_SECRET, etc. |
 | "Merchant issue" | Using live keys without activated account | Switch to test keys (`rzp_test_...`) |
 | "Order not found" | User ID mismatch or order expired | Ensure correct user token sent with request |
 | "Duplicate payment detected" | Payment already processed | Check database for existing purchase record |
