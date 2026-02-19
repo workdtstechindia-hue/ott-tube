@@ -9,6 +9,12 @@ const {
   deleteCloudinaryMedia,
   removeTempFile,
 } = require("../utils/cloudinaryMedia");
+const Category = require("../models/category.model");
+const Tag = require("../models/tag.model");
+const {
+  processVideoToHLS,
+  cleanupHlsFolder,
+} = require("../services/videoProcessing.service");
 
 const SYSTEM_ADMIN_OBJECT_ID = "000000000000000000000001";
 const resolveCreatorId = (reqUserId) => (reqUserId === "admin" ? SYSTEM_ADMIN_OBJECT_ID : reqUserId);
@@ -22,10 +28,14 @@ const toMovieResponse = (movie, includeVideo = false) => ({
   price: movie.price,
   coverImageUrl: movie.coverImage.url,
   coverImagePublicId: movie.coverImage.publicId,
+  category: movie.category ? { id: movie.category._id, name: movie.category.name } : null,
+  tags: Array.isArray(movie.tags)
+    ? movie.tags.map((t) => ({ id: t._id, name: t.name }))
+    : [],
   ...(includeVideo
     ? {
-        videoUrl: movie.videoFile.url,
-        videoPublicId: movie.videoFile.publicId,
+        videoUrl: movie.videoFile?.url,
+        videoPublicId: movie.videoFile?.publicId,
       }
     : {}),
   createdAt: movie.createdAt,
@@ -33,12 +43,12 @@ const toMovieResponse = (movie, includeVideo = false) => ({
 });
 
 const uploadMovie = asyncHandler(async (req, res) => {
-  const { title, description, rating, actors, price } = req.body;
+  const { title, description, rating, actors, price, category, tags } = req.body;
 
+  // basic validation
   if (!title || !description || typeof price === "undefined") {
     throw new ApiError(400, "title, description and price are required");
   }
-
   if (!req.files || !req.files.cover?.[0] || !req.files.video?.[0]) {
     throw new ApiError(400, "cover and video files are required");
   }
@@ -46,36 +56,62 @@ const uploadMovie = asyncHandler(async (req, res) => {
   const coverFile = req.files.cover[0];
   const videoFile = req.files.video[0];
   let uploadedCover = null;
-  let uploadedVideo = null;
+
+  // validate category/tags if present
+  let categoryId = null;
+  if (category) {
+    const cat = await Category.findById(category);
+    if (!cat) {
+      throw new ApiError(400, "Invalid category id");
+    }
+    categoryId = cat._id;
+  }
+
+  let tagIds = [];
+  if (tags) {
+    const arr = Array.isArray(tags) ? tags : [tags];
+    const found = await Tag.find({ _id: { $in: arr } });
+    if (found.length !== arr.length) {
+      throw new ApiError(400, "One or more tags are invalid");
+    }
+    tagIds = found.map((t) => t._id);
+  }
+
+  // create movie document first to reserve an _id for HLS folder
+  const movie = new Movie({
+    title: String(title).trim(),
+    description: String(description).trim(),
+    rating: Number(rating || 0),
+    actors: parseActors(actors),
+    price: Number(price),
+    coverImage: {}, // fill after upload
+    createdBy: resolveCreatorId(req.user.id),
+    category: categoryId,
+    tags: tagIds,
+  });
 
   try {
+    // upload cover image
     uploadedCover = await uploadMediaFromPath(coverFile.path, {
       folder: "movie-rental/covers",
       resourceType: "image",
     });
-    uploadedVideo = await uploadMediaFromPath(videoFile.path, {
-      folder: "movie-rental/videos",
-      resourceType: "video",
-    });
 
-    const movie = await Movie.create({
-      title: String(title).trim(),
-      description: String(description).trim(),
-      rating: Number(rating || 0),
-      actors: parseActors(actors),
-      price: Number(price),
-      coverImage: {
-        url: uploadedCover.secure_url,
-        publicId: uploadedCover.public_id,
-        resourceType: "image",
-      },
-      videoFile: {
-        url: uploadedVideo.secure_url,
-        publicId: uploadedVideo.public_id,
-        resourceType: "video",
-      },
-      createdBy: resolveCreatorId(req.user.id),
-    });
+    movie.coverImage = {
+      url: uploadedCover.secure_url,
+      publicId: uploadedCover.public_id,
+      resourceType: "image",
+    };
+
+    // save initially (video/hls will be added after processing)
+    await movie.save();
+
+    // convert the original video to HLS and upload segments
+    const { playlistUrl, folder } = await processVideoToHLS(videoFile.path, movie._id.toString());
+
+    movie.hlsPlaylistUrl = playlistUrl;
+    movie.hlsFolder = folder;
+    await movie.save();
 
     res.status(201).json({
       success: true,
@@ -83,11 +119,16 @@ const uploadMovie = asyncHandler(async (req, res) => {
       data: toMovieResponse(movie, true),
     });
   } catch (error) {
+    // rollback: remove cloudinary assets and database record if necessary
     if (uploadedCover?.public_id) {
       await deleteCloudinaryMedia(uploadedCover.public_id, "image");
     }
-    if (uploadedVideo?.public_id) {
-      await deleteCloudinaryMedia(uploadedVideo.public_id, "video");
+    if (movie && movie._id) {
+      await Movie.deleteOne({ _id: movie._id }).catch(() => {});
+      // also attempt to clean any partially uploaded hls files
+      if (movie.hlsFolder) {
+        await cleanupHlsFolder(movie.hlsFolder);
+      }
     }
     throw error;
   } finally {
@@ -101,14 +142,12 @@ const updateMovie = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Movie not found");
   }
 
-  const { title, description, rating, actors, price } = req.body;
+  const { title, description, rating, actors, price, category, tags } = req.body;
   const coverFile = req.files?.cover?.[0];
   const videoFile = req.files?.video?.[0];
 
   const originalCoverPublicId = movie.coverImage?.publicId;
-  const originalVideoPublicId = movie.videoFile?.publicId;
   let uploadedCover = null;
-  let uploadedVideo = null;
 
   try {
     if (typeof title !== "undefined") movie.title = String(title).trim();
@@ -116,6 +155,27 @@ const updateMovie = asyncHandler(async (req, res) => {
     if (typeof rating !== "undefined") movie.rating = Number(rating);
     if (typeof actors !== "undefined") movie.actors = parseActors(actors);
     if (typeof price !== "undefined") movie.price = Number(price);
+
+    if (typeof category !== "undefined") {
+      if (category) {
+        const cat = await Category.findById(category);
+        if (!cat) throw new ApiError(400, "Invalid category id");
+        movie.category = cat._id;
+      } else {
+        movie.category = null;
+      }
+    }
+
+    if (typeof tags !== "undefined") {
+      const arr = Array.isArray(tags) ? tags : [tags];
+      if (arr.length) {
+        const found = await Tag.find({ _id: { $in: arr } });
+        if (found.length !== arr.length) throw new ApiError(400, "One or more tags are invalid");
+        movie.tags = arr;
+      } else {
+        movie.tags = [];
+      }
+    }
 
     if (coverFile) {
       uploadedCover = await uploadMediaFromPath(coverFile.path, {
@@ -130,24 +190,21 @@ const updateMovie = asyncHandler(async (req, res) => {
     }
 
     if (videoFile) {
-      uploadedVideo = await uploadMediaFromPath(videoFile.path, {
-        folder: "movie-rental/videos",
-        resourceType: "video",
-      });
-      movie.videoFile = {
-        url: uploadedVideo.secure_url,
-        publicId: uploadedVideo.public_id,
-        resourceType: "video",
-      };
+      // new video bump: remove old hls assets then reprocess
+      if (movie.hlsFolder) {
+        await cleanupHlsFolder(movie.hlsFolder);
+        movie.hlsPlaylistUrl = null;
+        movie.hlsFolder = null;
+      }
+      const { playlistUrl, folder } = await processVideoToHLS(videoFile.path, movie._id.toString());
+      movie.hlsPlaylistUrl = playlistUrl;
+      movie.hlsFolder = folder;
     }
 
     await movie.save();
 
     if (uploadedCover?.public_id && originalCoverPublicId && originalCoverPublicId !== uploadedCover.public_id) {
       await deleteCloudinaryMedia(originalCoverPublicId, "image");
-    }
-    if (uploadedVideo?.public_id && originalVideoPublicId && originalVideoPublicId !== uploadedVideo.public_id) {
-      await deleteCloudinaryMedia(originalVideoPublicId, "video");
     }
 
     res.status(200).json({
@@ -159,9 +216,6 @@ const updateMovie = asyncHandler(async (req, res) => {
     if (uploadedCover?.public_id) {
       await deleteCloudinaryMedia(uploadedCover.public_id, "image");
     }
-    if (uploadedVideo?.public_id) {
-      await deleteCloudinaryMedia(uploadedVideo.public_id, "video");
-    }
     throw error;
   } finally {
     await Promise.allSettled([removeTempFile(coverFile?.path), removeTempFile(videoFile?.path)]);
@@ -169,7 +223,11 @@ const updateMovie = asyncHandler(async (req, res) => {
 });
 
 const getAllMovies = asyncHandler(async (req, res) => {
-  const movies = await Movie.find().sort({ createdAt: -1 });
+  const movies = await Movie.find()
+    .populate("category", "name")
+    .populate("tags", "name")
+    .sort({ createdAt: -1 })
+    .lean();
 
   res.status(200).json({
     success: true,
@@ -179,7 +237,10 @@ const getAllMovies = asyncHandler(async (req, res) => {
 });
 
 const getMovieById = asyncHandler(async (req, res) => {
-  const movie = await Movie.findById(req.params.movieId);
+  const movie = await Movie.findById(req.params.movieId)
+    .populate("category", "name")
+    .populate("tags", "name")
+    .lean();
   if (!movie) {
     throw new ApiError(404, "Movie not found");
   }
@@ -252,10 +313,14 @@ const deleteMovie = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Movie not found");
   }
 
-  await Promise.allSettled([
+  const tasks = [
     deleteCloudinaryMedia(movie.coverImage?.publicId, "image"),
-    deleteCloudinaryMedia(movie.videoFile?.publicId, "video"),
-  ]);
+  ];
+  if (movie.hlsFolder) {
+    tasks.push(cleanupHlsFolder(movie.hlsFolder));
+  }
+
+  await Promise.allSettled(tasks);
 
   await Movie.deleteOne({ _id: movie._id });
 

@@ -13,6 +13,10 @@ const movieToPublicResponse = (movie) => ({
   rating: movie.rating,
   price: movie.price,
   coverImageUrl: movie.coverImage.url,
+  category: movie.category ? { id: movie.category._id, name: movie.category.name } : null,
+  tags: Array.isArray(movie.tags)
+    ? movie.tags.map((t) => ({ id: t._id, name: t.name }))
+    : [],
   createdAt: movie.createdAt,
   updatedAt: movie.updatedAt,
 });
@@ -44,7 +48,13 @@ const listMovies = asyncHandler(async (req, res) => {
 
   const [totalMovies, movies] = await Promise.all([
     Movie.countDocuments(),
-    Movie.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+    Movie.find()
+      .populate("category", "name")
+      .populate("tags", "name")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
   ]);
 
   res.status(200).json({
@@ -58,7 +68,10 @@ const listMovies = asyncHandler(async (req, res) => {
 });
 
 const getMovieDetails = asyncHandler(async (req, res) => {
-  const movie = await Movie.findById(req.params.movieId);
+  const movie = await Movie.findById(req.params.movieId)
+    .populate("category", "name")
+    .populate("tags", "name")
+    .lean();
   if (!movie) {
     throw new ApiError(404, "Movie not found");
   }
@@ -70,6 +83,7 @@ const getMovieDetails = asyncHandler(async (req, res) => {
   });
 });
 
+// legacy endpoint that returned direct video link (kept for backward compatibility)
 const watchPurchasedMovie = asyncHandler(async (req, res) => {
   const { movie, purchase } = await ensureActiveAccess(req.user.id, req.params.movieId);
 
@@ -79,14 +93,22 @@ const watchPurchasedMovie = asyncHandler(async (req, res) => {
     data: {
       movie: movieToPublicResponse(movie),
       accessExpiresAt: purchase.accessExpiresAt,
-      watchLink: movie.videoFile.url,
+      watchLink: movie.videoFile?.url || null,
+      hlsPlaylistUrl: movie.hlsPlaylistUrl || null,
     },
   });
 });
 
+// new streaming endpoint returns HLS playlist URL after verifying purchase
 const streamPurchasedMovie = asyncHandler(async (req, res) => {
   const { movie } = await ensureActiveAccess(req.user.id, req.params.movieId);
-  res.redirect(movie.videoFile.url);
+  if (!movie.hlsPlaylistUrl) {
+    throw new ApiError(404, "Stream not available");
+  }
+  res.status(200).json({
+    success: true,
+    data: { hlsPlaylistUrl: movie.hlsPlaylistUrl },
+  });
 });
 
 module.exports = { listMovies, getMovieDetails, watchPurchasedMovie, streamPurchasedMovie };

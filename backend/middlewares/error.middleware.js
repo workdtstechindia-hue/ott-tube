@@ -9,6 +9,12 @@ const notFoundHandler = (req, res) => {
 
 const errorHandler = (err, req, res, next) => {
   if (res.headersSent) {
+    console.error({
+      route: req.originalUrl,
+      error: err.message,
+      stack: err.stack,
+      timestamp: new Date().toISOString(),
+    });
     return next(err);
   }
 
@@ -43,6 +49,17 @@ const errorHandler = (err, req, res, next) => {
     statusCode = err.statusCode;
     message = err.message;
   }
+
+  // log structured error for debugging (without secrets)
+  console.error({
+    route: req.originalUrl,
+    method: req.method,
+    statusCode,
+    message,
+    error: err.message,
+    stack: process.env.NODE_ENV !== "production" ? err.stack : undefined,
+    timestamp: new Date().toISOString(),
+  });
 
   return res.status(statusCode).json({
     success: false,

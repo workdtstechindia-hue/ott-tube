@@ -8,30 +8,43 @@ const { calculateExpiryDate } = require("../utils/calculateExpiry");
 const env = require("../config/env");
 
 const createOrder = asyncHandler(async (req, res) => {
-  const { movieId } = req.body;
-  if (!movieId) {
-    throw new ApiError(400, "movieId is required");
+  // allow creation by movieId (preferred) or by explicit amount
+  const { movieId, amount } = req.body;
+  let movie = null;
+
+  if (movieId) {
+    movie = await Movie.findById(movieId);
+    if (!movie) {
+      throw new ApiError(404, "Movie not found");
+    }
+
+    const activePurchase = await Purchase.findOne({
+      user: req.user.id,
+      movie: movie._id,
+      status: "paid",
+      accessExpiresAt: { $gt: new Date() },
+    });
+
+    if (activePurchase) {
+      throw new ApiError(409, "You already rented this movie and your access is still active");
+    }
   }
 
-  const movie = await Movie.findById(movieId);
-  if (!movie) {
-    throw new ApiError(404, "Movie not found");
+  // amount in rupees must be present either via movie or body
+  let rupees;
+  if (movie) {
+    rupees = Number(movie.price);
+  } else if (typeof amount !== "undefined") {
+    rupees = Number(amount);
   }
 
-  const activePurchase = await Purchase.findOne({
-    user: req.user.id,
-    movie: movie._id,
-    status: "paid",
-    accessExpiresAt: { $gt: new Date() },
-  });
-
-  if (activePurchase) {
-    throw new ApiError(409, "You already rented this movie and your access is still active");
+  if (isNaN(rupees) || rupees <= 0) {
+    throw new ApiError(400, "Valid amount or movieId must be provided");
   }
 
-  // Razorpay: amount in paise (₹49 → 4900), min ₹1 = 100 paise, receipt max 40 chars
-  const amountPaise = Math.max(100, Math.round(Number(movie.price) * 100));
-  const receipt = `m_${movie._id.toString().slice(-18)}_${String(Date.now()).slice(-8)}`;
+  // convert to paise, enforce minimum
+  const amountPaise = Math.max(100, Math.round(rupees * 100));
+  const receipt = `o_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 
   let order;
   try {
@@ -41,15 +54,16 @@ const createOrder = asyncHandler(async (req, res) => {
       receipt,
       notes: {
         userId: req.user.id,
-        movieId: movie._id.toString(),
+        movieId: movie ? movie._id.toString() : null,
       },
     });
+    console.log(`[Payment] created razorpay order ${order.id} for user ${req.user.id}`);
   } catch (razorpayError) {
     const err = razorpayError?.error || razorpayError;
-    const description = err?.description || razorpayError?.description || err?.message || razorpayError?.message;
+    const description =
+      err?.description || razorpayError?.description || err?.message || razorpayError?.message;
     console.error("[Payment] Razorpay create order failed:", description || razorpayError);
 
-    // "Merchant issue" often = Live keys used while testing (use rzp_test_* for test mode)
     let message = description || "Payment service is temporarily unavailable. Please try again.";
     if (
       String(message).toLowerCase().includes("merchant") ||
@@ -63,8 +77,8 @@ const createOrder = asyncHandler(async (req, res) => {
 
   await Purchase.create({
     user: req.user.id,
-    movie: movie._id,
-    amount: movie.price,
+    movie: movie ? movie._id : null,
+    amount: rupees,
     currency: "INR",
     razorpayOrderId: order.id,
     status: "pending",
@@ -78,7 +92,7 @@ const createOrder = asyncHandler(async (req, res) => {
       amount: order.amount,
       currency: order.currency,
       keyId: env.razorpayKeyId,
-      movieId: movie._id.toString(),
+      movieId: movie ? movie._id.toString() : undefined,
     },
   });
 });
@@ -184,4 +198,63 @@ const getOrderStatus = asyncHandler(async (req, res) => {
   });
 });
 
-module.exports = { createOrder, verifyPayment, getOrderStatus };
+
+// webhook handler for Razorpay events
+const handleWebhook = asyncHandler(async (req, res) => {
+  const signature = req.headers["x-razorpay-signature"];
+  const body = req.rawBody || JSON.stringify(req.body);
+
+  if (!signature) {
+    console.error("[Webhook] missing signature header");
+    return res.status(400).json({ success: false, message: "Signature header missing" });
+  }
+
+  const expected = crypto
+    .createHmac("sha256", env.razorpayWebhookSecret || "")
+    .update(body)
+    .digest("hex");
+
+  if (expected !== signature) {
+    console.error("[Webhook] signature mismatch", { expected, received: signature });
+    return res.status(400).json({ success: false, message: "Invalid webhook signature" });
+  }
+
+  const event = req.body.event;
+  const payload = req.body.payload || {};
+
+  console.log("[Webhook] event received", event);
+
+  // handle relevant events
+  if (event === "payment.captured") {
+    const payment = payload.payment.entity;
+    try {
+      const purchase = await Purchase.findOne({ razorpayOrderId: payment.order_id });
+      if (purchase && purchase.status !== "paid") {
+        purchase.razorpayPaymentId = payment.id;
+        purchase.status = "paid";
+        purchase.paidAt = new Date(payment.created_at * 1000);
+        purchase.accessExpiresAt = calculateExpiryDate();
+        await purchase.save();
+        console.log("[Webhook] marked purchase paid", purchase._id);
+      }
+    } catch (err) {
+      console.error("[Webhook] error updating payment.captured", err);
+    }
+  } else if (event === "payment.failed") {
+    const payment = payload.payment.entity;
+    try {
+      const purchase = await Purchase.findOne({ razorpayOrderId: payment.order_id });
+      if (purchase && purchase.status !== "failed") {
+        purchase.status = "failed";
+        await purchase.save();
+        console.log("[Webhook] marked purchase failed", purchase._id);
+      }
+    } catch (err) {
+      console.error("[Webhook] error updating payment.failed", err);
+    }
+  }
+
+  res.status(200).json({ success: true });
+});
+
+module.exports = { createOrder, verifyPayment, getOrderStatus, handleWebhook };

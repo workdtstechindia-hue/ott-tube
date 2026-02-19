@@ -11,6 +11,8 @@ const requiredKeys = [
   "JWT_EXPIRES_IN",
   "RAZORPAY_KEY_ID",
   "RAZORPAY_KEY_SECRET",
+  "RAZORPAY_WEBHOOK_SECRET",
+  "FRONTEND_URL",
   "CLOUDINARY_CLOUD_NAME",
   "CLOUDINARY_API_KEY",
   "CLOUDINARY_API_SECRET",
@@ -21,6 +23,11 @@ if (missing.length > 0) {
   throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
 }
 
+// log masked razorpay key ID for confirmation (last 4 chars visible)
+const maskKey = (str = "") => str.replace(/.(?=.{4})/g, "*");
+console.log("[Env] Razorpay Key ID:", maskKey(process.env.RAZORPAY_KEY_ID || ""));
+console.log("[Env] Frontend URL:", process.env.FRONTEND_URL || "<not set>");
+
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT) || 5000,
@@ -30,6 +37,8 @@ module.exports = {
   rentalDurationDays: Math.max(1, Number(process.env.RENTAL_DURATION_DAYS) || 30),
   razorpayKeyId: process.env.RAZORPAY_KEY_ID,
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
+  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+  frontendUrl: process.env.FRONTEND_URL,
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,

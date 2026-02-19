@@ -39,10 +39,33 @@ const movieSchema = new mongoose.Schema(
       type: mediaSchema,
       required: true,
     },
+    // original video file reference (kept for legacy / compatibility)
     videoFile: {
       type: mediaSchema,
-      required: true,
+      required: false,
     },
+    // new HLS playlist info (Cloudinary folder is stored to allow later cleanup)
+    hlsPlaylistUrl: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    hlsFolder: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+    category: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Category",
+      default: null,
+    },
+    tags: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Tag",
+      },
+    ],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Admin",

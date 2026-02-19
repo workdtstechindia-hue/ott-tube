@@ -1,8 +1,11 @@
 const express = require("express");
 const cors = require("cors");
+const env = require("./config/env");
 
 const authRoutes = require("./routes/auth.routes");
 const movieRoutes = require("./routes/movie.routes");
+const categoryRoutes = require("./routes/category.routes");
+const tagRoutes = require("./routes/tag.routes");
 const paymentRoutes = require("./routes/payment.routes");
 const adminRoutes = require("./routes/admin.routes");
 const userRoutes = require("./routes/user.routes");
@@ -25,6 +28,7 @@ const corsOptions = {
       "https://localhost:3000",
       "https://localhost:5173",
       // Add your production frontend URL here
+      ...(env.frontendUrl ? [env.frontendUrl] : []),
     ];
     if (allowedOrigins.includes(origin) || process.env.NODE_ENV === "development") {
       callback(null, true);
@@ -38,7 +42,12 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+// capture raw request body in case we need to verify signatures (webhooks)
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString();
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/health", (req, res) => {
@@ -47,9 +56,11 @@ app.get("/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/movies", movieRoutes);
+app.use("/api/categories", categoryRoutes);
+app.use("/api/tags", tagRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/user", userRoutes);
+app.use("/api/user", userRoutes);}]}
 
 app.use(notFoundHandler);
 app.use(errorHandler);
