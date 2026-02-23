@@ -193,7 +193,7 @@ const getOrderStatus = asyncHandler(async (req, res) => {
       orderId: purchase.razorpayOrderId,
       paymentId: purchase.razorpayPaymentId || null,
       status: purchase.status,
-      amount: purchase.amount,
+      amount: (purchase.amount || 0) / 100,
       currency: purchase.currency,
       paidAt: purchase.paidAt,
       accessExpiresAt: purchase.accessExpiresAt,

@@ -3,10 +3,14 @@
     "version": "1.0.0",
     "description": "Production-ready Movie Rental Backend",
     "main": "server.js",
+    "engines": {
+        "node": ">=18"
+    },
     "scripts": {
         "start": "node server.js",
         "dev": "node server.js",
-        "test": "echo \"No test specified\" && exit 0"
+        "test": "echo \"No test specified\" && exit 0",
+        "smoke:payment": "node scripts/smoke-test-payment.js"
     },
     "keywords": [],
     "author": "",

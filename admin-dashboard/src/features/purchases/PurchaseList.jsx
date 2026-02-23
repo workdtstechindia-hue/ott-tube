@@ -172,7 +172,7 @@ const PurchaseList = () => {
                       })()}
                     </td>
                     <td className="w-1/6 px-5 py-4 text-center align-middle text-[var(--text-muted)]">
-                      {new Date(item.purchasedAt).toLocaleDateString()}
+                      {new Date(item.purchaseDate || item.purchasedAt).toLocaleDateString()}
                     </td>
                     <td className="w-1/6 px-5 py-4 text-center align-middle text-[var(--text-muted)]">
                       {new Date(item.expiryDate).toLocaleDateString()}

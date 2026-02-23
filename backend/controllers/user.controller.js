@@ -4,9 +4,6 @@ const asyncHandler = require("../utils/asyncHandler");
 const { revokeExpiredAccess } = require("../utils/cleanupExpiredAccess");
 const { uploadMediaFromPath, removeTempFile } = require("../utils/cloudinaryMedia");
 const ApiError = require("../utils/ApiError");
-const env = require("../config/env");
-const path = require("path");
-const fs = require("fs/promises");
 
 const getMyMovies = asyncHandler(async (req, res) => {
   await revokeExpiredAccess();
@@ -43,10 +40,6 @@ const getMyMovies = asyncHandler(async (req, res) => {
 const updateProfile = asyncHandler(async (req, res) => {
   // Payload validation
   const { username, email, phone, bio } = req.body || {};
-
-  if (!username || !String(username).trim()) {
-    throw new ApiError(400, "username is required");
-  }
 
   if (email) {
     const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -85,7 +78,13 @@ const updateProfile = asyncHandler(async (req, res) => {
     }
   }
 
-  user.username = String(username).trim();
+  if (typeof username !== "undefined") {
+    const trimmedUsername = String(username).trim();
+    if (!trimmedUsername) {
+      throw new ApiError(400, "username cannot be empty");
+    }
+    user.username = trimmedUsername;
+  }
   if (email) user.email = String(email).trim().toLowerCase();
   if (typeof phone !== "undefined") user.phone = String(phone).trim();
   if (typeof bio !== "undefined") user.bio = String(bio).trim();

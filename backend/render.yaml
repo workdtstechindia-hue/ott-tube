@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: ott-tube-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true

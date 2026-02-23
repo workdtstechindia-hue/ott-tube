@@ -5,13 +5,11 @@ const dotenv = require("dotenv");
 dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 
 const requiredKeys = [
-  "PORT",
   "MONGO_URI",
   "JWT_SECRET",
   "JWT_EXPIRES_IN",
   "RAZORPAY_KEY_ID",
   "RAZORPAY_KEY_SECRET",
-  "RAZORPAY_WEBHOOK_SECRET",
   "FRONTEND_URL",
   "CLOUDINARY_CLOUD_NAME",
   "CLOUDINARY_API_KEY",
@@ -37,8 +35,12 @@ module.exports = {
   rentalDurationDays: Math.max(1, Number(process.env.RENTAL_DURATION_DAYS) || 30),
   razorpayKeyId: process.env.RAZORPAY_KEY_ID,
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
-  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || "",
   frontendUrl: process.env.FRONTEND_URL,
+  corsOrigins: (process.env.CORS_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME,
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY,
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET,
