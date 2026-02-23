@@ -2,8 +2,8 @@ import axios from "axios";
 import { tokenService } from "../services/tokenService";
 
 const api = axios.create({
-  baseURL: "https://ott-tube-backend.onrender.com/",
-  timeout: 10000,
+  baseURL: "http://localhost:5000",
+  timeout: 20000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -36,7 +36,7 @@ api.interceptors.response.use(
       error?.message ||
       "Something went wrong. Please try again.";
 
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       tokenService.clearAll();
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";

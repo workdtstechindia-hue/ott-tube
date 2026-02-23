@@ -36,37 +36,15 @@ try {
   compressionMiddleware = null;
 }
 
-const isProduction = env.nodeEnv === "production";
-const fallbackOrigins = [
-  "https://ott-tube-admin.onrender.com",
-  "http://localhost:5173",
-];
-const configuredOrigins = Array.isArray(env.allowedOrigins) ? env.allowedOrigins : [];
-const allowedOrigins = new Set(configuredOrigins.length ? configuredOrigins : fallbackOrigins);
-if (!isProduction) {
-  allowedOrigins.add("http://localhost:5173");
-  allowedOrigins.add("http://localhost:3000");
-  allowedOrigins.add("http://127.0.0.1:5173");
-}
-
-if (isProduction && configuredOrigins.length === 0) {
-  console.error(
-    "[CORS] ALLOWED_ORIGINS is empty in production. Applying secure fallback allowlist."
-  );
-}
-
 const corsOptions = {
   origin: (origin, callback) => {
-    // No Origin header => native mobile app, Postman, curl.
+    // Universal mode:
+    // - undefined origin => native mobile app, Postman, curl
+    // - any browser origin => allowed
     if (!origin) {
       return callback(null, true);
     }
-
-    if (allowedOrigins.has(origin)) {
-      return callback(null, true);
-    }
-
-    return callback(new Error(`CORS policy: Access denied for origin ${origin}`));
+    return callback(null, true);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],

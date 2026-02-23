@@ -215,13 +215,13 @@ const MovieForm = ({
     let cancelled = false;
     const fetchLists = async () => {
       try {
-        const [{ data: catResp }, { data: tagResp }] = await Promise.all([
+        const [catResp, tagResp] = await Promise.all([
           categoryAPI.list(),
           tagAPI.list(),
         ]);
         if (!cancelled) {
-          setCategories(catResp.data);
-          setTagsList(tagResp.data);
+          setCategories(Array.isArray(catResp?.data) ? catResp.data : []);
+          setTagsList(Array.isArray(tagResp?.data) ? tagResp.data : []);
         }
       } catch (err) {
         // ignore - admin page already authenticated

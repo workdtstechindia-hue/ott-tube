@@ -125,7 +125,7 @@ const UserList = () => {
               <tbody>
                 {paginatedUsers.map((user) => (
                   <tr
-                    key={user.id}
+                    key={user.id || user._id}
                     className="table-row h-14 transition"
                   >
                     <td className="w-1/4 px-5 py-4 text-center align-middle font-medium text-[var(--text-primary)]">
