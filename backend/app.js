@@ -13,13 +13,25 @@ const { notFoundHandler, errorHandler } = require("./middlewares/error.middlewar
 
 const app = express();
 
+const isProduction = env.nodeEnv === "production";
+const allowedOrigin =
+  env.frontendUrl || (!isProduction ? "http://localhost:5173" : null);
+
+if (isProduction && !allowedOrigin) {
+  console.warn(
+    "[CORS] FRONTEND_URL is not set in production. Browser requests are restricted to CORS_ORIGINS only."
+  );
+}
+
 const allowedOrigins = new Set([
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "http://localhost:8081",
-  "https://localhost:3000",
-  "https://localhost:5173",
-  ...(env.frontendUrl ? [env.frontendUrl] : []),
+  ...(isProduction ? [] : [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8081",
+    "https://localhost:3000",
+    "https://localhost:5173",
+  ]),
+  ...(allowedOrigin ? [allowedOrigin] : []),
   ...(Array.isArray(env.corsOrigins) ? env.corsOrigins : []),
 ]);
 
@@ -30,7 +42,11 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    if (env.nodeEnv === "development" || allowedOrigins.has(origin)) {
+    if (!isProduction && allowedOrigins.has(origin)) {
+      return callback(null, true);
+    }
+
+    if (isProduction && allowedOrigins.has(origin)) {
       return callback(null, true);
     }
 

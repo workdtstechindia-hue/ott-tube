@@ -7,13 +7,6 @@ dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 const requiredKeys = [
   "MONGO_URI",
   "JWT_SECRET",
-  "JWT_EXPIRES_IN",
-  "RAZORPAY_KEY_ID",
-  "RAZORPAY_KEY_SECRET",
-  "FRONTEND_URL",
-  "CLOUDINARY_CLOUD_NAME",
-  "CLOUDINARY_API_KEY",
-  "CLOUDINARY_API_SECRET",
 ];
 
 const missing = requiredKeys.filter((key) => !process.env[key]);
@@ -21,10 +14,12 @@ if (missing.length > 0) {
   throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
 }
 
-// log masked razorpay key ID for confirmation (last 4 chars visible)
-const maskKey = (str = "") => str.replace(/.(?=.{4})/g, "*");
-console.log("[Env] Razorpay Key ID:", maskKey(process.env.RAZORPAY_KEY_ID || ""));
-console.log("[Env] Frontend URL:", process.env.FRONTEND_URL || "<not set>");
+if ((process.env.NODE_ENV || "development") !== "production") {
+  // log masked razorpay key ID for local debugging only
+  const maskKey = (str = "") => str.replace(/.(?=.{4})/g, "*");
+  console.log("[Env] Razorpay Key ID:", maskKey(process.env.RAZORPAY_KEY_ID || ""));
+  console.log("[Env] Frontend URL:", process.env.FRONTEND_URL || "<not set>");
+}
 
 module.exports = {
   nodeEnv: process.env.NODE_ENV || "development",
