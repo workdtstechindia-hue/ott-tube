@@ -2,7 +2,7 @@ import axios from "axios";
 import { tokenService } from "../services/tokenService";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000",
+  baseURL: "https://ott-tube-server.onrender.com",
   timeout: 20000,
   headers: {
     "Content-Type": "application/json",
