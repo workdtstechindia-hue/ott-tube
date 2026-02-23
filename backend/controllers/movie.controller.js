@@ -4,6 +4,7 @@ const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { getPagination, buildPaginationMeta } = require("../utils/pagination");
 const { revokeExpiredAccess } = require("../utils/cleanupExpiredAccess");
+const { cache } = require("../services/cache.service");
 
 const movieToPublicResponse = (movie) => ({
   id: movie._id,
@@ -24,7 +25,7 @@ const movieToPublicResponse = (movie) => ({
 const ensureActiveAccess = async (userId, movieId) => {
   await revokeExpiredAccess();
 
-  const movie = await Movie.findById(movieId);
+  const movie = await Movie.findById(movieId).populate("category", "name").populate("tags", "name").lean();
   if (!movie) {
     throw new ApiError(404, "Movie not found");
   }
@@ -46,9 +47,16 @@ const ensureActiveAccess = async (userId, movieId) => {
 const listMovies = asyncHandler(async (req, res) => {
   const { currentPage, limit, skip } = getPagination(req.query.page, req.query.limit);
 
+  const cacheKey = `movies:list:${currentPage}:${limit}`;
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    return res.status(200).json(cached);
+  }
+
   const [totalMovies, movies] = await Promise.all([
     Movie.countDocuments(),
     Movie.find()
+      .select("-__v")
       .populate("category", "name")
       .populate("tags", "name")
       .sort({ createdAt: -1 })
@@ -57,18 +65,23 @@ const listMovies = asyncHandler(async (req, res) => {
       .lean(),
   ]);
 
-  res.status(200).json({
+  const responsePayload = {
     success: true,
     message: "Movies fetched successfully",
     data: {
       ...buildPaginationMeta(totalMovies, currentPage, limit),
       movies: movies.map(movieToPublicResponse),
     },
-  });
+  };
+
+  cache.set(cacheKey, responsePayload, 30 * 1000);
+
+  return res.status(200).json(responsePayload);
 });
 
 const getMovieDetails = asyncHandler(async (req, res) => {
   const movie = await Movie.findById(req.params.movieId)
+    .select("-__v")
     .populate("category", "name")
     .populate("tags", "name")
     .lean();
@@ -76,7 +89,7 @@ const getMovieDetails = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Movie not found");
   }
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "Movie details fetched",
     data: movieToPublicResponse(movie),
@@ -87,7 +100,7 @@ const getMovieDetails = asyncHandler(async (req, res) => {
 const watchPurchasedMovie = asyncHandler(async (req, res) => {
   const { movie, purchase } = await ensureActiveAccess(req.user.id, req.params.movieId);
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "Watch access granted",
     data: {
@@ -105,8 +118,9 @@ const streamPurchasedMovie = asyncHandler(async (req, res) => {
   if (!movie.hlsPlaylistUrl) {
     throw new ApiError(404, "Stream not available");
   }
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
+    message: "Stream URL fetched",
     data: { hlsPlaylistUrl: movie.hlsPlaylistUrl },
   });
 });

@@ -16,7 +16,9 @@ const getMyMovies = asyncHandler(async (req, res) => {
     .populate("movie", "title description actors rating price coverImage")
     .sort({ paidAt: -1 });
 
-  const movies = purchases.map((purchase) => ({
+  const movies = purchases
+    .filter((purchase) => purchase.movie)
+    .map((purchase) => ({
     movieId: purchase.movie._id,
     title: purchase.movie.title,
     description: purchase.movie.description,
@@ -28,9 +30,9 @@ const getMyMovies = asyncHandler(async (req, res) => {
     expiryDate: purchase.accessExpiresAt,
     status: purchase.status === "paid" && purchase.accessExpiresAt > new Date() ? "Active" : "Expired",
     watchLink: `/api/user/watch/${purchase.movie._id}`,
-  }));
+    }));
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "Purchased movies fetched successfully",
     data: movies,
@@ -102,7 +104,7 @@ const updateProfile = asyncHandler(async (req, res) => {
     role: user.role,
   };
 
-  res.status(200).json({ success: true, message: "Profile updated", data: safe });
+  return res.status(200).json({ success: true, message: "Profile updated", data: safe });
 });
 
 const getTransactions = asyncHandler(async (req, res) => {
@@ -131,7 +133,12 @@ const getTransactions = asyncHandler(async (req, res) => {
     expiryDate: p.accessExpiresAt,
   }));
 
-  res.status(200).json({ success: true, message: "Transactions fetched", data, meta: { page, limit, total } });
+  return res.status(200).json({
+    success: true,
+    message: "Transactions fetched",
+    data,
+    meta: { page, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+  });
 });
 
 module.exports = { getMyMovies, updateProfile, getTransactions };

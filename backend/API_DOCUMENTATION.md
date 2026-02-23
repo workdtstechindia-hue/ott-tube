@@ -105,7 +105,8 @@ Notes:
 ### POST `/api/auth/login`
 
 Purpose:
-- Login normal user.
+- Login a normal user account.
+- Also accepts admin credentials from environment variables (`ADMIN_EMAIL` / `ADMIN_PASSWORD`) and returns an admin JWT when matched.
 
 Body:
 ```json
@@ -122,7 +123,7 @@ Response `200`:
   "message": "Login successful",
   "data": {
     "user": {
-      "id": "USER_ID",
+      "id": "USER_OR_ADMIN_ID",
       "name": "John Doe",
       "email": "john@mail.com",
       "role": "user"
@@ -135,7 +136,7 @@ Response `200`:
 ### POST `/api/auth/admin/login`
 
 Purpose:
-- Login admin account from `admin_data` collection.
+- Login admin account using environment credentials (`ADMIN_EMAIL`, `ADMIN_PASSWORD`).
 
 Body:
 ```json
@@ -152,7 +153,7 @@ Response `200`:
   "message": "Admin login successful",
   "data": {
     "user": {
-      "id": "ADMIN_ID",
+      "id": "admin",
       "name": "System Admin",
       "email": "admin2@mail.com",
       "role": "admin"
@@ -184,7 +185,14 @@ Response `200`:
 }
 ```
 
-Error `401` (missing/invalid/expired token):
+Error `401` examples:
+```json
+{
+  "success": false,
+  "message": "Authorization token is missing"
+}
+```
+
 ```json
 {
   "success": false,
@@ -192,7 +200,14 @@ Error `401` (missing/invalid/expired token):
 }
 ```
 
-Error `404` (token valid but account no longer exists):
+```json
+{
+  "success": false,
+  "message": "User not found or inactive"
+}
+```
+
+Error `404` (token valid but account removed after auth check):
 ```json
 {
   "success": false,
@@ -278,6 +293,7 @@ Response `200`:
 ```json
 {
   "success": true,
+  "message": "Categories fetched",
   "data": [
     { "_id": "CAT_ID", "name": "Action" },
     { "_id": "CAT_ID2", "name": "Comedy" }
@@ -300,7 +316,7 @@ Body:
 
 Response `201`:
 ```json
-{ "success": true, "data": { "_id": "NEW_ID", "name": "Horror" } }
+{ "success": true, "message": "Category created", "data": { "_id": "NEW_ID", "name": "Horror" } }
 ```
 
 ### GET `/api/tags`
@@ -308,7 +324,17 @@ Response `201`:
 Purpose:
 - Retrieve available tags.
 
-Response is identical in structure to `/api/categories`.
+Response `200`:
+```json
+{
+  "success": true,
+  "message": "Tags fetched",
+  "data": [
+    { "_id": "TAG_ID", "name": "Thriller" },
+    { "_id": "TAG_ID2", "name": "Drama" }
+  ]
+}
+```
 
 ### POST `/api/tags`
 
@@ -316,6 +342,11 @@ Purpose:
 - Admin only – create a new tag.
 
 (see `/api/categories` for headers/body syntax)
+
+Response `201`:
+```json
+{ "success": true, "message": "Tag created", "data": { "_id": "NEW_ID", "name": "Thriller" } }
+```
 
 ---
 
@@ -333,11 +364,35 @@ Response `200`:
 ```json
 {
   "success": true,
+  "message": "Stream URL fetched",
   "data": { "hlsPlaylistUrl": "https://res.cloudinary.com/…/hls/MOVIE_ID/playlist.m3u8" }
 }
 ```
 
 Error `403` if the movie has not been purchased or access expired.
+
+### GET `/api/movies/:movieId/watch`
+
+Purpose:
+- Legacy compatibility endpoint for purchased movie access.
+- Returns detailed watch payload for active rentals.
+
+Headers:
+- `Authorization: Bearer <USER_JWT>`
+
+Response `200`:
+```json
+{
+  "success": true,
+  "message": "Watch access granted",
+  "data": {
+    "movie": { "id": "MOVIE_ID", "title": "Inception" },
+    "accessExpiresAt": "2026-03-16T10:00:00.000Z",
+    "watchLink": null,
+    "hlsPlaylistUrl": "https://res.cloudinary.com/<cloud>/video/upload/v123/hls/playlist.m3u8"
+  }
+}
+```
 
 
 ---
@@ -360,13 +415,13 @@ Request headers:
 Body (JSON):
 ```json
 {
-  "movieId": "MOVIE_ID",   // preferred, server will infer amount from movie
-  "amount": 199            // optional override in rupees if no movieId
+  "movieId": "MOVIE_ID"
 }
 ```
 
 Notes:
-- `amount` must be > 0; if both provided, `movieId` takes precedence.
+- `movieId` is required.
+- Amount is inferred from movie price on server.
 
 Response `201`:
 ```json
@@ -466,7 +521,7 @@ Raw body: JSON object provided by Razorpay (see their docs).
 
 Response `200` always:
 ```json
-{ "success": true }
+{ "success": true, "message": "Webhook processed", "data": null }
 ```
 
 Error `400` for missing/invalid signature.
@@ -500,6 +555,7 @@ Response `200`:
       "coverImageUrl": "https://res.cloudinary.com/<cloud>/image/upload/v123/movie-rental/covers/file.jpg",
       "purchasedAt": "2026-02-16T10:00:00.000Z",
       "expiryDate": "2026-03-16T10:00:00.000Z",
+      "status": "Active",
       "watchLink": "/api/user/watch/MOVIE_ID"
     }
   ]
@@ -510,7 +566,7 @@ Response `200`:
 
 Purpose:
 - Validate active rental access for the movie.
-- Returns direct Cloudinary video URL for playback.
+- Returns movie details with watch access metadata.
 
 Response `200`:
 ```json
@@ -526,11 +582,14 @@ Response `200`:
       "rating": 8.8,
       "price": 199,
       "coverImageUrl": "https://res.cloudinary.com/<cloud>/image/upload/v123/movie-rental/covers/file.jpg",
+      "category": { "id": "CAT_ID", "name": "Action" },
+      "tags": [{ "id": "TAG_ID", "name": "Thriller" }],
       "createdAt": "2026-02-16T10:00:00.000Z",
       "updatedAt": "2026-02-16T10:00:00.000Z"
     },
     "accessExpiresAt": "2026-03-16T10:00:00.000Z",
-    "watchLink": "https://res.cloudinary.com/<cloud>/video/upload/v123/movie-rental/videos/file.mp4"
+    "watchLink": null,
+    "hlsPlaylistUrl": "https://res.cloudinary.com/<cloud>/video/upload/v123/hls/playlist.m3u8"
   }
 }
 ```
@@ -538,12 +597,93 @@ Response `200`:
 ### GET `/api/user/watch/:movieId/stream`
 
 Purpose:
-- Redirects to the Cloudinary video URL.
+- Returns HLS stream playlist URL after validating active purchase.
 - Requires valid active purchase.
 
-Response:
-- Redirect response (`302`) to Cloudinary video URL if access valid.
-- `403` if not purchased or expired.
+Response `200`:
+```json
+{
+  "success": true,
+  "message": "Stream URL fetched",
+  "data": {
+    "hlsPlaylistUrl": "https://res.cloudinary.com/<cloud>/video/upload/v123/hls/playlist.m3u8"
+  }
+}
+```
+
+### PUT `/api/user/profile`
+
+Purpose:
+- Update authenticated user profile details and optional avatar.
+
+Headers:
+- `Authorization: Bearer <USER_JWT>`
+
+Request:
+- `multipart/form-data` or `application/json`
+
+Body fields (all optional):
+- `username` (string)
+- `email` (string)
+- `phone` (string)
+- `bio` (string)
+- `avatar` (file: image)
+
+Response `200`:
+```json
+{
+  "success": true,
+  "message": "Profile updated",
+  "data": {
+    "id": "USER_ID",
+    "name": "John Doe",
+    "username": "johnny",
+    "email": "john@mail.com",
+    "phone": "+91 9999999999",
+    "bio": "Movie lover",
+    "avatar": "https://res.cloudinary.com/<cloud>/image/upload/...",
+    "role": "user"
+  }
+}
+```
+
+### GET `/api/user/transactions`
+
+Purpose:
+- Get paginated payment transactions for authenticated user.
+
+Headers:
+- `Authorization: Bearer <USER_JWT>`
+
+Query params:
+- `page` default `1`
+- `limit` default `20`, max `50`
+
+Response `200`:
+```json
+{
+  "success": true,
+  "message": "Transactions fetched",
+  "data": [
+    {
+      "orderId": "order_xxx",
+      "paymentId": "pay_xxx",
+      "movieTitle": "Inception",
+      "amount": 199,
+      "status": "paid",
+      "createdAt": "2026-02-20T10:00:00.000Z",
+      "purchaseDate": "2026-02-20T10:02:00.000Z",
+      "expiryDate": "2026-03-20T10:02:00.000Z"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 1,
+    "totalPages": 1
+  }
+}
+```
 
 ---
 
@@ -607,7 +747,26 @@ Response `200`:
 ### GET `/api/admin/movies`
 
 Purpose:
-- Get all movies (admin view).
+- Get paginated movies (admin view).
+
+Query params:
+- `page` default `1`
+- `limit` default `10`, max `50`
+
+Response `200`:
+```json
+{
+  "success": true,
+  "message": "All movies fetched",
+  "data": [{ "id": "MOVIE_ID", "title": "Inception" }],
+  "meta": {
+    "totalItems": 1,
+    "totalPages": 1,
+    "currentPage": 1,
+    "limit": 10
+  }
+}
+```
 
 ### GET `/api/admin/movies/:movieId`
 
@@ -654,6 +813,11 @@ Response `201`:
   }
 }
 ```
+
+### POST `/api/movies/upload`
+
+Purpose:
+- Admin alias for `POST /api/admin/movies` (same payload/response).
 
 ### PUT `/api/admin/movies/:movieId`
 
@@ -704,19 +868,58 @@ Response `200`:
 ```json
 {
   "success": true,
-  "message": "Movie deleted successfully"
+  "message": "Movie deleted successfully",
+  "data": null
 }
 ```
 
 ### GET `/api/admin/users`
 
 Purpose:
-- List all users.
+- List users with pagination.
+
+Query params:
+- `page` default `1`
+- `limit` default `10`, max `50`
+
+Response `200`:
+```json
+{
+  "success": true,
+  "message": "All users fetched",
+  "data": [{ "_id": "USER_ID", "name": "John Doe", "email": "john@mail.com", "role": "user" }],
+  "meta": {
+    "totalItems": 1,
+    "totalPages": 1,
+    "currentPage": 1,
+    "limit": 10
+  }
+}
+```
 
 ### GET `/api/admin/purchases`
 
 Purpose:
-- List all purchases with user/movie references.
+- List purchases with pagination.
+
+Query params:
+- `page` default `1`
+- `limit` default `10`, max `50`
+
+Response `200`:
+```json
+{
+  "success": true,
+  "message": "All purchases fetched",
+  "data": [{ "id": "PURCHASE_ID", "paymentStatus": "paid" }],
+  "meta": {
+    "totalItems": 1,
+    "totalPages": 1,
+    "currentPage": 1,
+    "limit": 10
+  }
+}
+```
 
 ---
 
@@ -736,7 +939,7 @@ Purpose:
 5. If verify succeeds, user can access:
 - `/api/user/my-movies`
 - `/api/user/watch/:movieId`
-- `/api/user/watch/:movieId/stream` (optional redirect endpoint)
+- `/api/user/watch/:movieId/stream` (JSON stream URL endpoint)
 
 ---
 

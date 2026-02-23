@@ -77,4 +77,8 @@ const movieSchema = new mongoose.Schema(
   }
 );
 
+movieSchema.index({ createdAt: -1 });
+movieSchema.index({ category: 1, createdAt: -1 });
+movieSchema.index({ tags: 1, createdAt: -1 });
+
 module.exports = mongoose.model("Movie", movieSchema);

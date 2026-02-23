@@ -1,7 +1,7 @@
 const ApiError = require("../utils/ApiError");
 
 const notFoundHandler = (req, res) => {
-  res.status(404).json({
+  return res.status(404).json({
     success: false,
     message: `Route not found: ${req.originalUrl}`,
   });
@@ -45,6 +45,20 @@ const errorHandler = (err, req, res, next) => {
     message = "Invalid or expired token";
   }
 
+  if (err.type === "entity.too.large") {
+    statusCode = 413;
+    message = "Payload too large";
+  }
+
+  if (err.code === "LIMIT_FILE_SIZE") {
+    statusCode = 413;
+    message = "Uploaded file is too large";
+  }
+
+  if (typeof message === "string" && message.startsWith("CORS policy:")) {
+    statusCode = 403;
+  }
+
   if (err instanceof ApiError) {
     statusCode = err.statusCode;
     message = err.message;
@@ -65,7 +79,7 @@ const errorHandler = (err, req, res, next) => {
     success: false,
     message,
     ...(details ? { details } : {}),
-    ...(process.env.NODE_ENV !== "production" ? { stack: err.stack } : {}),
+    ...(process.env.NODE_ENV !== "production" ? { error: err.stack || String(err) } : {}),
   });
 };
 

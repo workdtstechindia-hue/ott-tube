@@ -3,6 +3,8 @@ const Purchase = require("../models/purchase.model");
 const User = require("../models/user.model");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
+const { getPagination } = require("../utils/pagination");
+const { cache } = require("../services/cache.service");
 const { parseActors } = require("../utils/parseActors");
 const {
   uploadMediaFromPath,
@@ -113,7 +115,8 @@ const uploadMovie = asyncHandler(async (req, res) => {
     movie.hlsFolder = folder;
     await movie.save();
 
-    res.status(201).json({
+    cache.clearPrefix("movies:list");
+    return res.status(201).json({
       success: true,
       message: "Movie uploaded successfully",
       data: toMovieResponse(movie, true),
@@ -207,7 +210,8 @@ const updateMovie = asyncHandler(async (req, res) => {
       await deleteCloudinaryMedia(originalCoverPublicId, "image");
     }
 
-    res.status(200).json({
+    cache.clearPrefix("movies:list");
+    return res.status(200).json({
       success: true,
       message: "Movie updated successfully",
       data: toMovieResponse(movie, true),
@@ -223,21 +227,36 @@ const updateMovie = asyncHandler(async (req, res) => {
 });
 
 const getAllMovies = asyncHandler(async (req, res) => {
-  const movies = await Movie.find()
-    .populate("category", "name")
-    .populate("tags", "name")
-    .sort({ createdAt: -1 })
-    .lean();
+  const { currentPage, limit, skip } = getPagination(req.query.page, req.query.limit);
 
-  res.status(200).json({
+  const [totalItems, movies] = await Promise.all([
+    Movie.countDocuments(),
+    Movie.find()
+      .select("-__v")
+      .populate("category", "name")
+      .populate("tags", "name")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+  ]);
+
+  return res.status(200).json({
     success: true,
     message: "All movies fetched",
     data: movies.map((movie) => toMovieResponse(movie, true)),
+    meta: {
+      totalItems,
+      totalPages: Math.max(1, Math.ceil(totalItems / limit)),
+      currentPage,
+      limit,
+    },
   });
 });
 
 const getMovieById = asyncHandler(async (req, res) => {
   const movie = await Movie.findById(req.params.movieId)
+    .select("-__v")
     .populate("category", "name")
     .populate("tags", "name")
     .lean();
@@ -245,7 +264,7 @@ const getMovieById = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Movie not found");
   }
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "Movie details fetched",
     data: toMovieResponse(movie, true),
@@ -253,20 +272,44 @@ const getMovieById = asyncHandler(async (req, res) => {
 });
 
 const getAllUsers = asyncHandler(async (req, res) => {
-  const users = await User.find().select("_id name email role isActive createdAt").sort({ createdAt: -1 });
+  const { currentPage, limit, skip } = getPagination(req.query.page, req.query.limit);
 
-  res.status(200).json({
+  const [totalItems, users] = await Promise.all([
+    User.countDocuments(),
+    User.find()
+      .select("_id name email role isActive createdAt updatedAt")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+  ]);
+
+  return res.status(200).json({
     success: true,
     message: "All users fetched",
     data: users,
+    meta: {
+      totalItems,
+      totalPages: Math.max(1, Math.ceil(totalItems / limit)),
+      currentPage,
+      limit,
+    },
   });
 });
 
 const getAllPurchases = asyncHandler(async (req, res) => {
-  const purchases = await Purchase.find()
-    .populate("user", "name email role")
-    .populate("movie", "title price")
-    .sort({ createdAt: -1 });
+  const { currentPage, limit, skip } = getPagination(req.query.page, req.query.limit);
+
+  const [totalItems, purchases] = await Promise.all([
+    Purchase.countDocuments(),
+    Purchase.find()
+      .populate("user", "name email role")
+      .populate("movie", "title price")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+  ]);
 
   // map to admin-friendly response
   const mapped = purchases.map((p) => ({
@@ -283,10 +326,16 @@ const getAllPurchases = asyncHandler(async (req, res) => {
     createdAt: p.createdAt,
   }));
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "All purchases fetched",
     data: mapped,
+    meta: {
+      totalItems,
+      totalPages: Math.max(1, Math.ceil(totalItems / limit)),
+      currentPage,
+      limit,
+    },
   });
 });
 
@@ -316,7 +365,7 @@ const getDashboardOverview = asyncHandler(async (req, res) => {
     Purchase.countDocuments({ status: "failed" }),
   ]);
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "Dashboard overview fetched",
     data: {
@@ -349,9 +398,11 @@ const deleteMovie = asyncHandler(async (req, res) => {
 
   await Movie.deleteOne({ _id: movie._id });
 
-  res.status(200).json({
+  cache.clearPrefix("movies:list");
+  return res.status(200).json({
     success: true,
     message: "Movie deleted successfully",
+    data: null,
   });
 });
 

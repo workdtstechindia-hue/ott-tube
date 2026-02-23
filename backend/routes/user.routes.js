@@ -8,6 +8,7 @@ const { watchPurchasedMovie, streamPurchasedMovie } = require("../controllers/mo
 const { authenticate } = require("../middlewares/auth.middleware");
 const { authorize } = require("../middlewares/role.middleware");
 const { uploadAvatar } = require("../config/multer");
+const { validatePaginationQuery } = require("../validators/pagination.validators");
 const router = express.Router();
 
 router.use(authenticate, authorize("user"));
@@ -18,6 +19,6 @@ router.get("/watch/:movieId/stream", streamPurchasedMovie);
 
 // Profile update (avatar optional)
 router.put("/profile", uploadAvatar, updateProfile);
-router.get("/transactions", getTransactions);
+router.get("/transactions", validatePaginationQuery, getTransactions);
 
 module.exports = router;

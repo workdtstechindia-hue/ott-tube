@@ -8,12 +8,15 @@ const { calculateExpiryDate } = require("../utils/calculateExpiry");
 const env = require("../config/env");
 
 const createOrder = asyncHandler(async (req, res) => {
-  // allow creation by movieId (preferred) or by explicit amount
-  const { movieId, amount } = req.body;
+  const { movieId } = req.body;
   let movie = null;
 
+  if (!movieId) {
+    throw new ApiError(400, "movieId is required");
+  }
+
   if (movieId) {
-    movie = await Movie.findById(movieId);
+    movie = await Movie.findById(movieId).select("_id price").lean();
     if (!movie) {
       throw new ApiError(404, "Movie not found");
     }
@@ -30,16 +33,10 @@ const createOrder = asyncHandler(async (req, res) => {
     }
   }
 
-  // amount in rupees must be present either via movie or body
-  let rupees;
-  if (movie) {
-    rupees = Number(movie.price);
-  } else if (typeof amount !== "undefined") {
-    rupees = Number(amount);
-  }
+  const rupees = Number(movie?.price);
 
   if (isNaN(rupees) || rupees <= 0) {
-    throw new ApiError(400, "Valid amount or movieId must be provided");
+    throw new ApiError(400, "Valid movie price is required to create order");
   }
 
   // convert to paise, enforce minimum
@@ -85,7 +82,7 @@ const createOrder = asyncHandler(async (req, res) => {
     status: "pending",
   });
 
-  res.status(201).json({
+  return res.status(201).json({
     success: true,
     message: "Razorpay order created",
     data: {
@@ -157,7 +154,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
 
   await purchase.save();
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "Payment verified successfully",
     data: {
@@ -180,13 +177,13 @@ const getOrderStatus = asyncHandler(async (req, res) => {
   const purchase = await Purchase.findOne({
     razorpayOrderId: orderId,
     user: req.user.id,
-  });
+  }).lean();
 
   if (!purchase) {
     throw new ApiError(404, "Order not found");
   }
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     message: "Order status retrieved",
     data: {
@@ -257,7 +254,7 @@ const handleWebhook = asyncHandler(async (req, res) => {
     }
   }
 
-  res.status(200).json({ success: true });
+  return res.status(200).json({ success: true, message: "Webhook processed", data: null });
 });
 
 module.exports = { createOrder, verifyPayment, getOrderStatus, handleWebhook };

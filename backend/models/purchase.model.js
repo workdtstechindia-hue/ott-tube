@@ -57,6 +57,8 @@ const purchaseSchema = new mongoose.Schema(
 );
 
 purchaseSchema.index({ user: 1, movie: 1, status: 1, accessExpiresAt: 1 });
+purchaseSchema.index({ user: 1, createdAt: -1 });
+purchaseSchema.index({ status: 1, createdAt: -1 });
 // add indexes for razorpay identifiers to speed lookups during verification/webhook
 purchaseSchema.index({ razorpayOrderId: 1 }, { unique: true, sparse: true });
 purchaseSchema.index({ razorpayPaymentId: 1 }, { unique: true, sparse: true });

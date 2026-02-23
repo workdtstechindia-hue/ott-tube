@@ -55,9 +55,16 @@ const startServer = async () => {
     console.log(`MongoDB connected to database: ${dbConnection.connection.name}`);
 
     server = http.createServer(app);
+    server.requestTimeout = env.requestTimeoutMs;
+    server.keepAliveTimeout = env.keepAliveTimeoutMs;
+    server.headersTimeout = env.headersTimeoutMs;
 
     server.listen(env.port, () => {
       console.log(`Server running on port ${env.port}`);
+    });
+
+    server.on("error", (error) => {
+      shutdown("serverError", error);
     });
 
     startExpiryCleanupJob();

@@ -9,10 +9,11 @@ const { uploadMovie, updateMovie } = require("../controllers/admin.controller");
 const { authenticate } = require("../middlewares/auth.middleware");
 const { authorize } = require("../middlewares/role.middleware");
 const { uploadMovieAssets } = require("../config/multer");
+const { validatePaginationQuery } = require("../validators/pagination.validators");
 
 const router = express.Router();
 
-router.get("/", listMovies);
+router.get("/", validatePaginationQuery, listMovies);
 router.get("/:movieId", getMovieDetails);
 
 // allow admins to upload via public path (mirrors /api/admin/movies)

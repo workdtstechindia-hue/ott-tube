@@ -92,7 +92,8 @@ Notes:
 ### POST `/api/auth/login`
 
 Purpose:
-- Login normal user.
+- Login a normal user account.
+- Also accepts admin credentials from environment variables (`ADMIN_EMAIL` / `ADMIN_PASSWORD`) and returns an admin JWT when matched.
 
 Body:
 ```json
@@ -109,7 +110,7 @@ Response `200`:
   "message": "Login successful",
   "data": {
     "user": {
-      "id": "USER_ID",
+      "id": "USER_OR_ADMIN_ID",
       "name": "John Doe",
       "email": "john@mail.com",
       "role": "user"
@@ -122,7 +123,7 @@ Response `200`:
 ### POST `/api/auth/admin/login`
 
 Purpose:
-- Login admin account from `admin_data` collection.
+- Login admin account using environment credentials (`ADMIN_EMAIL`, `ADMIN_PASSWORD`).
 
 Body:
 ```json
@@ -139,7 +140,7 @@ Response `200`:
   "message": "Admin login successful",
   "data": {
     "user": {
-      "id": "ADMIN_ID",
+      "id": "admin",
       "name": "System Admin",
       "email": "admin2@mail.com",
       "role": "admin"
@@ -171,7 +172,14 @@ Response `200`:
 }
 ```
 
-Error `401` (missing/invalid/expired token):
+Error `401` examples:
+```json
+{
+  "success": false,
+  "message": "Authorization token is missing"
+}
+```
+
 ```json
 {
   "success": false,
@@ -179,7 +187,14 @@ Error `401` (missing/invalid/expired token):
 }
 ```
 
-Error `404` (token valid but account no longer exists):
+```json
+{
+  "success": false,
+  "message": "User not found or inactive"
+}
+```
+
+Error `404` (token valid but account removed after auth check):
 ```json
 {
   "success": false,

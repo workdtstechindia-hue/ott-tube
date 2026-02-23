@@ -7,6 +7,7 @@ const {
 } = require("../controllers/payment.controller");
 const { authenticate } = require("../middlewares/auth.middleware");
 const { authorize } = require("../middlewares/role.middleware");
+const { validateCreateOrderBody, validateVerifyPaymentBody } = require("../validators/payment.validators");
 
 const router = express.Router();
 
@@ -16,8 +17,8 @@ router.post("/webhook", handleWebhook);
 // all other payment APIs are user-protected
 router.use(authenticate, authorize("user"));
 
-router.post("/create-order", createOrder);
-router.post("/verify", verifyPayment);
+router.post("/create-order", validateCreateOrderBody, createOrder);
+router.post("/verify", validateVerifyPaymentBody, verifyPayment);
 router.get("/order/:orderId", getOrderStatus);
 
 module.exports = router;

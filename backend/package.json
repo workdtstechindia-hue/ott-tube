@@ -9,7 +9,8 @@
     "scripts": {
         "start": "node server.js",
         "dev": "node server.js",
-        "test": "echo \"No test specified\" && exit 0",
+        "lint": "node --check app.js && node --check server.js && node --check controllers/auth.controller.js && node --check controllers/admin.controller.js && node --check controllers/movie.controller.js && node --check controllers/payment.controller.js && node --check controllers/user.controller.js && node --check middlewares/error.middleware.js",
+        "test": "node --test tests/**/*.test.js",
         "smoke:payment": "node scripts/smoke-test-payment.js"
     },
     "keywords": [],
@@ -21,8 +22,10 @@
         "cors": "^2.8.6",
         "dotenv": "^17.3.1",
         "express": "^4.22.1",
+        "compression": "^1.7.5",
         "fluent-ffmpeg": "^2.1.2",
         "hls.js": "^1.6.15",
+        "helmet": "^8.1.0",
         "jsonwebtoken": "^9.0.3",
         "mongoose": "^8.23.0",
         "multer": "^2.0.2",
