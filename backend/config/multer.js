@@ -51,7 +51,7 @@ const uploadMovieAssets = multer({
 ]);
 
 const chunkRootDir = path.join(os.tmpdir(), "uploads");
-const MAX_CHUNK_SIZE = 4 * 1024 * 1024 * 1024;
+const MAX_CHUNK_SIZE = 100 * 1024 * 1024;
 
 const chunkStorage = multer.diskStorage({
   destination: (req, file, cb) => {

@@ -9,7 +9,7 @@ const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const cloudinary = require("../config/cloudinary");
 
-const MAX_CHUNK_SIZE = 4 * 1024 * 1024 * 1024;
+const MAX_CHUNK_SIZE = 100 * 1024 * 1024;
 const SESSION_RETENTION_MS = 24 * 60 * 60 * 1000;
 const FINALIZE_TIMEOUT_MS = 45 * 60 * 1000;
 const UPLOAD_ROOT = path.join(os.tmpdir(), "uploads");
@@ -199,7 +199,7 @@ const uploadChunk = asyncHandler(async (req, res) => {
 
   if (fileChunk.size > MAX_CHUNK_SIZE) {
     await safeUnlink(fileChunk.path);
-    throw new ApiError(413, "Chunk exceeds max allowed size (4GB)");
+    throw new ApiError(413, "Chunk exceeds max allowed size (100MB)");
   }
 
   if (chunkIndex < 0 || chunkIndex >= totalChunks) {

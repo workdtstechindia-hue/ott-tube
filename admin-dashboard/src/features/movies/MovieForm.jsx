@@ -13,7 +13,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 25 * 1024 * 1024 * 1024;
-const CHUNK_SIZE = 4 * 1024 * 1024 * 1024;
+const CHUNK_SIZE = 20 * 1024 * 1024;
 const MAX_PARALLEL_CHUNKS = 2;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-matroska"];
