@@ -56,7 +56,7 @@ const startServer = async () => {
     console.log(`MongoDB connected to database: ${dbConnection.connection.name}`);
 
     server = http.createServer(app);
-    server.requestTimeout = env.requestTimeoutMs;
+    server.requestTimeout = 0;
     server.keepAliveTimeout = env.keepAliveTimeoutMs;
     server.headersTimeout = env.headersTimeoutMs;
 

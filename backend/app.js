@@ -62,7 +62,7 @@ if (compressionMiddleware) {
 app.use(requestLogger);
 app.use(applySecurityHeaders);
 app.use(createRateLimiter({ windowMs: env.rateLimitWindowMs, max: env.rateLimitMax }));
-app.use(requestTimeout(env.requestTimeoutMs));
+app.use(requestTimeout(0));
 // capture raw request body in case we need to verify signatures (webhooks)
 app.use(express.json({
   limit: env.jsonLimit,
