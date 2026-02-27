@@ -66,6 +66,25 @@ const safeRmDir = async (dirPath) => {
   }
 };
 
+const readChunkIndexesFromDisk = async (sessionId) => {
+  const sessionDir = getSessionDir(sessionId);
+  let entries = [];
+  try {
+    entries = await fsp.readdir(sessionDir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+
+  return entries
+    .filter((entry) => entry.isFile() && /^chunk_\d+$/.test(entry.name))
+    .map((entry) => Number.parseInt(entry.name.replace("chunk_", ""), 10))
+    .filter((index) => Number.isFinite(index))
+    .sort((a, b) => a - b);
+};
+
 const pipeChunkToStream = (chunkPath, targetStream) =>
   new Promise((resolve, reject) => {
     const source = fs.createReadStream(chunkPath);
@@ -209,27 +228,41 @@ const uploadChunk = asyncHandler(async (req, res) => {
     throw new ApiError(409, "Upload already completed");
   }
 
-  if (session.uploadedChunks.includes(chunkIndex)) {
+  const targetPath = getChunkPath(sessionId, chunkIndex);
+  let targetExists = false;
+  try {
+    await fsp.access(targetPath);
+    targetExists = true;
+  } catch (_error) {
+    targetExists = false;
+  }
+
+  if (session.uploadedChunks.includes(chunkIndex) || targetExists) {
     await safeUnlink(fileChunk.path);
+    const updated = await UploadSession.findOneAndUpdate(
+      { sessionId },
+      { $addToSet: { uploadedChunks: chunkIndex }, $set: { status: "uploading" } },
+      { new: true }
+    );
+
     return res.status(200).json({
       success: true,
       message: "Chunk already uploaded",
       data: {
         sessionId,
         chunkIndex,
-        uploadedChunks: [...session.uploadedChunks].sort((a, b) => a - b),
+        uploadedChunks: [...(updated?.uploadedChunks || session.uploadedChunks)].sort((a, b) => a - b),
       },
     });
   }
 
   await fsp.mkdir(getSessionDir(sessionId), { recursive: true });
-
-  const targetPath = getChunkPath(sessionId, chunkIndex);
   await fsp.rename(fileChunk.path, targetPath);
-
-  session.uploadedChunks.push(chunkIndex);
-  session.status = "uploading";
-  await session.save();
+  const updatedSession = await UploadSession.findOneAndUpdate(
+    { sessionId },
+    { $addToSet: { uploadedChunks: chunkIndex }, $set: { status: "uploading" } },
+    { new: true }
+  );
 
   return res.status(200).json({
     success: true,
@@ -237,9 +270,9 @@ const uploadChunk = asyncHandler(async (req, res) => {
     data: {
       sessionId,
       chunkIndex,
-      uploadedChunks: [...session.uploadedChunks].sort((a, b) => a - b),
+      uploadedChunks: [...(updatedSession?.uploadedChunks || [])].sort((a, b) => a - b),
       totalChunks: session.totalChunks,
-      status: session.status,
+      status: updatedSession?.status || session.status,
     },
   });
 });
@@ -309,18 +342,25 @@ const finalizeUploadSession = asyncHandler(async (req, res) => {
     });
   }
 
-  const uploadedSet = new Set(session.uploadedChunks);
-  if (uploadedSet.size !== session.totalChunks) {
-    throw new ApiError(400, "Not all chunks are uploaded");
+  const diskIndexes = await readChunkIndexesFromDisk(sessionId);
+  if (diskIndexes.length !== session.totalChunks) {
+    const diskSet = new Set(diskIndexes);
+    const missing = [];
+    for (let index = 0; index < session.totalChunks; index += 1) {
+      if (!diskSet.has(index)) {
+        missing.push(index);
+      }
+    }
+    throw new ApiError(400, `Missing chunk ${missing[0]}`);
   }
 
-  for (let index = 0; index < session.totalChunks; index += 1) {
-    const chunkPath = getChunkPath(sessionId, index);
-    try {
-      await fsp.access(chunkPath);
-    } catch (error) {
-      throw new ApiError(400, `Missing chunk ${index}`);
-    }
+  const normalizedUploaded = [...new Set(session.uploadedChunks)].sort((a, b) => a - b);
+  const sameUploaded =
+    normalizedUploaded.length === diskIndexes.length &&
+    normalizedUploaded.every((value, idx) => value === diskIndexes[idx]);
+  if (!sameUploaded) {
+    session.uploadedChunks = diskIndexes;
+    await session.save();
   }
 
   session.status = "processing";
