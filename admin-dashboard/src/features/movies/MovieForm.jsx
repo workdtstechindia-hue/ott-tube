@@ -57,9 +57,9 @@ const Field = memo(function Field({
         onChange={onChange}
         required={required}
         placeholder=" "
-        className="peer h-12 w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 pt-4 text-sm text-[var(--text-primary)] outline-none transition duration-200 ease-in-out hover:shadow-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-400/30 dark:focus:ring-blue-600/40"
+        className="peer h-12 w-full rounded-xl border border-slate-300 bg-white px-3 pt-4 text-sm text-slate-900 outline-none transition duration-200 ease-in-out placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-500/25"
       />
-      <span className="pointer-events-none absolute left-3 top-3 origin-left bg-transparent px-1 text-xs text-[var(--text-muted)] transition peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-focus:top-1 peer-focus:text-xs peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:text-xs">
+      <span className="pointer-events-none absolute left-3 top-3 origin-left bg-transparent px-1 text-xs text-slate-500 transition peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-focus:top-1 peer-focus:text-xs peer-focus:text-blue-600 peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:text-xs dark:text-slate-400 dark:peer-focus:text-blue-400">
         {label}
       </span>
     </label>
@@ -642,7 +642,7 @@ const MovieForm = ({
             <select
               value={form.categoryId}
               onChange={(e) => setForm((prev) => ({ ...prev, categoryId: e.target.value }))}
-              className="mt-1 block w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
+              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition hover:border-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-500/25"
             >
               <option value="">-- choose one --</option>
               {categories.map((c) => (
@@ -656,7 +656,7 @@ const MovieForm = ({
               placeholder="New category"
               value={form.newCategoryName}
               onChange={(e) => setForm((prev) => ({ ...prev, newCategoryName: e.target.value }))}
-              className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm"
+              className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition hover:border-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-500/25"
             />
             <button
               type="button"
@@ -678,7 +678,7 @@ const MovieForm = ({
                 const opts = Array.from(e.target.selectedOptions).map((o) => o.value);
                 setForm((prev) => ({ ...prev, tagIds: opts }));
               }}
-              className="mt-1 block w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
+              className="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition hover:border-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-500/25"
             >
               {tagsList.map((t) => (
                 <option key={t._id} value={t._id}> {t.name} </option>
@@ -691,7 +691,7 @@ const MovieForm = ({
               placeholder="New tag"
               value={form.newTagName}
               onChange={(e) => setForm((prev) => ({ ...prev, newTagName: e.target.value }))}
-              className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm"
+              className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition hover:border-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-500/25"
             />
             <button
               type="button"
@@ -709,9 +709,9 @@ const MovieForm = ({
               onChange={handleChange}
               rows={5}
               placeholder=" "
-              className="peer w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 pt-5 text-sm text-[var(--text-primary)] outline-none transition focus:border-gray-500 focus:ring-2 focus:ring-gray-400/40"
+              className="peer w-full rounded-xl border border-slate-300 bg-white px-3 pt-5 text-sm text-slate-900 outline-none transition hover:border-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-200 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-500 dark:focus:border-blue-400 dark:focus:ring-blue-500/25"
             />
-            <span className="pointer-events-none absolute left-3 top-3 origin-left bg-transparent px-1 text-xs text-[var(--text-muted)] transition peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm peer-focus:top-1 peer-focus:text-xs peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:text-xs">
+            <span className="pointer-events-none absolute left-3 top-3 origin-left bg-transparent px-1 text-xs text-slate-500 transition peer-placeholder-shown:top-4 peer-placeholder-shown:text-sm peer-focus:top-1 peer-focus:text-xs peer-focus:text-blue-600 peer-[:not(:placeholder-shown)]:top-1 peer-[:not(:placeholder-shown)]:text-xs dark:text-slate-400 dark:peer-focus:text-blue-400">
               Description
             </span>
           </label>

@@ -22,13 +22,9 @@ const {
 const SYSTEM_ADMIN_OBJECT_ID = "000000000000000000000001";
 const resolveCreatorId = (reqUserId) => (reqUserId === "admin" ? SYSTEM_ADMIN_OBJECT_ID : reqUserId);
 
-const resolveUploadedVideoSession = async (uploadSessionId, videoUrl, videoPublicId) => {
-  if (!uploadSessionId && !videoUrl && !videoPublicId) {
+const resolveUploadedVideoSession = async (uploadSessionId) => {
+  if (!uploadSessionId) {
     return null;
-  }
-
-  if (!uploadSessionId || !videoUrl || !videoPublicId) {
-    throw new ApiError(400, "uploadSessionId, videoUrl and videoPublicId must be provided together");
   }
 
   const session = await UploadSession.findOne({ sessionId: String(uploadSessionId).trim() });
@@ -38,11 +34,8 @@ const resolveUploadedVideoSession = async (uploadSessionId, videoUrl, videoPubli
   if (session.status !== "completed") {
     throw new ApiError(409, "Upload session is not completed");
   }
-  if (session.cloudinaryPublicId !== String(videoPublicId).trim()) {
-    throw new ApiError(409, "Upload session public id mismatch");
-  }
-  if (session.cloudinaryUrl !== String(videoUrl).trim()) {
-    throw new ApiError(409, "Upload session URL mismatch");
+  if (!session.cloudinaryPublicId || !session.cloudinaryUrl) {
+    throw new ApiError(409, "Upload session has no finalized video");
   }
 
   return session;
@@ -81,8 +74,6 @@ const uploadMovie = asyncHandler(async (req, res) => {
     category,
     tags,
     uploadSessionId,
-    videoUrl,
-    videoPublicId,
   } = req.body;
 
   // basic validation
@@ -95,7 +86,7 @@ const uploadMovie = asyncHandler(async (req, res) => {
 
   const coverFile = req.files.cover[0];
   const videoFile = req.files.video?.[0];
-  const uploadedSession = await resolveUploadedVideoSession(uploadSessionId, videoUrl, videoPublicId);
+  const uploadedSession = await resolveUploadedVideoSession(uploadSessionId);
 
   if (!videoFile && !uploadedSession) {
     throw new ApiError(400, "video upload is required");
@@ -207,12 +198,10 @@ const updateMovie = asyncHandler(async (req, res) => {
     category,
     tags,
     uploadSessionId,
-    videoUrl,
-    videoPublicId,
   } = req.body;
   const coverFile = req.files?.cover?.[0];
   const videoFile = req.files?.video?.[0];
-  const uploadedSession = await resolveUploadedVideoSession(uploadSessionId, videoUrl, videoPublicId);
+  const uploadedSession = await resolveUploadedVideoSession(uploadSessionId);
 
   const originalCoverPublicId = movie.coverImage?.publicId;
   const originalVideoPublicId = movie.videoFile?.publicId;
