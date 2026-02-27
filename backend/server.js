@@ -5,6 +5,7 @@ const app = require("./app");
 const env = require("./config/env");
 const { connectDB } = require("./config/db");
 const { startExpiryCleanupJob } = require("./utils/cleanupExpiredAccess");
+const { startUploadSessionCleanupJob } = require("./services/uploadSessionCleanup.service");
 
 let server;
 let dbConnection;
@@ -68,6 +69,7 @@ const startServer = async () => {
     });
 
     startExpiryCleanupJob();
+    startUploadSessionCleanupJob();
   } catch (error) {
     console.error("Startup failed:", error.message);
     process.exit(1);

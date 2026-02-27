@@ -13,6 +13,7 @@ const {
 } = require("../utils/cloudinaryMedia");
 const Category = require("../models/category.model");
 const Tag = require("../models/tag.model");
+const UploadSession = require("../models/uploadSession.model");
 const {
   processVideoToHLS,
   cleanupHlsFolder,
@@ -20,6 +21,32 @@ const {
 
 const SYSTEM_ADMIN_OBJECT_ID = "000000000000000000000001";
 const resolveCreatorId = (reqUserId) => (reqUserId === "admin" ? SYSTEM_ADMIN_OBJECT_ID : reqUserId);
+
+const resolveUploadedVideoSession = async (uploadSessionId, videoUrl, videoPublicId) => {
+  if (!uploadSessionId && !videoUrl && !videoPublicId) {
+    return null;
+  }
+
+  if (!uploadSessionId || !videoUrl || !videoPublicId) {
+    throw new ApiError(400, "uploadSessionId, videoUrl and videoPublicId must be provided together");
+  }
+
+  const session = await UploadSession.findOne({ sessionId: String(uploadSessionId).trim() });
+  if (!session) {
+    throw new ApiError(404, "Upload session not found");
+  }
+  if (session.status !== "completed") {
+    throw new ApiError(409, "Upload session is not completed");
+  }
+  if (session.cloudinaryPublicId !== String(videoPublicId).trim()) {
+    throw new ApiError(409, "Upload session public id mismatch");
+  }
+  if (session.cloudinaryUrl !== String(videoUrl).trim()) {
+    throw new ApiError(409, "Upload session URL mismatch");
+  }
+
+  return session;
+};
 
 const toMovieResponse = (movie, includeVideo = false) => ({
   id: movie._id,
@@ -45,18 +72,35 @@ const toMovieResponse = (movie, includeVideo = false) => ({
 });
 
 const uploadMovie = asyncHandler(async (req, res) => {
-  const { title, description, rating, actors, price, category, tags } = req.body;
+  const {
+    title,
+    description,
+    rating,
+    actors,
+    price,
+    category,
+    tags,
+    uploadSessionId,
+    videoUrl,
+    videoPublicId,
+  } = req.body;
 
   // basic validation
   if (!title || !description || typeof price === "undefined") {
     throw new ApiError(400, "title, description and price are required");
   }
-  if (!req.files || !req.files.cover?.[0] || !req.files.video?.[0]) {
-    throw new ApiError(400, "cover and video files are required");
+  if (!req.files || !req.files.cover?.[0]) {
+    throw new ApiError(400, "cover file is required");
   }
 
   const coverFile = req.files.cover[0];
-  const videoFile = req.files.video[0];
+  const videoFile = req.files.video?.[0];
+  const uploadedSession = await resolveUploadedVideoSession(uploadSessionId, videoUrl, videoPublicId);
+
+  if (!videoFile && !uploadedSession) {
+    throw new ApiError(400, "video upload is required");
+  }
+
   let uploadedCover = null;
 
   // validate category/tags if present
@@ -108,11 +152,20 @@ const uploadMovie = asyncHandler(async (req, res) => {
     // save initially (video/hls will be added after processing)
     await movie.save();
 
-    // convert the original video to HLS and upload segments
-    const { playlistUrl, folder } = await processVideoToHLS(videoFile.path, movie._id.toString());
+    if (videoFile) {
+      const { playlistUrl, folder } = await processVideoToHLS(videoFile.path, movie._id.toString());
+      movie.hlsPlaylistUrl = playlistUrl;
+      movie.hlsFolder = folder;
+    } else if (uploadedSession) {
+      movie.videoFile = {
+        url: uploadedSession.cloudinaryUrl,
+        publicId: uploadedSession.cloudinaryPublicId,
+        resourceType: "video",
+      };
+      uploadedSession.movieId = movie._id;
+      await uploadedSession.save();
+    }
 
-    movie.hlsPlaylistUrl = playlistUrl;
-    movie.hlsFolder = folder;
     await movie.save();
 
     cache.clearPrefix("movies:list");
@@ -135,7 +188,7 @@ const uploadMovie = asyncHandler(async (req, res) => {
     }
     throw error;
   } finally {
-    await Promise.allSettled([removeTempFile(coverFile.path), removeTempFile(videoFile.path)]);
+    await Promise.allSettled([removeTempFile(coverFile.path), removeTempFile(videoFile?.path)]);
   }
 });
 
@@ -145,11 +198,24 @@ const updateMovie = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Movie not found");
   }
 
-  const { title, description, rating, actors, price, category, tags } = req.body;
+  const {
+    title,
+    description,
+    rating,
+    actors,
+    price,
+    category,
+    tags,
+    uploadSessionId,
+    videoUrl,
+    videoPublicId,
+  } = req.body;
   const coverFile = req.files?.cover?.[0];
   const videoFile = req.files?.video?.[0];
+  const uploadedSession = await resolveUploadedVideoSession(uploadSessionId, videoUrl, videoPublicId);
 
   const originalCoverPublicId = movie.coverImage?.publicId;
+  const originalVideoPublicId = movie.videoFile?.publicId;
   let uploadedCover = null;
 
   try {
@@ -202,12 +268,33 @@ const updateMovie = asyncHandler(async (req, res) => {
       const { playlistUrl, folder } = await processVideoToHLS(videoFile.path, movie._id.toString());
       movie.hlsPlaylistUrl = playlistUrl;
       movie.hlsFolder = folder;
+      movie.videoFile = undefined;
+    } else if (uploadedSession) {
+      if (movie.hlsFolder) {
+        await cleanupHlsFolder(movie.hlsFolder);
+        movie.hlsPlaylistUrl = null;
+        movie.hlsFolder = null;
+      }
+      movie.videoFile = {
+        url: uploadedSession.cloudinaryUrl,
+        publicId: uploadedSession.cloudinaryPublicId,
+        resourceType: "video",
+      };
+      uploadedSession.movieId = movie._id;
+      await uploadedSession.save();
     }
 
     await movie.save();
 
     if (uploadedCover?.public_id && originalCoverPublicId && originalCoverPublicId !== uploadedCover.public_id) {
       await deleteCloudinaryMedia(originalCoverPublicId, "image");
+    }
+    if (
+      uploadedSession &&
+      originalVideoPublicId &&
+      originalVideoPublicId !== uploadedSession.cloudinaryPublicId
+    ) {
+      await deleteCloudinaryMedia(originalVideoPublicId, "video");
     }
 
     cache.clearPrefix("movies:list");
@@ -390,6 +477,9 @@ const deleteMovie = asyncHandler(async (req, res) => {
   const tasks = [
     deleteCloudinaryMedia(movie.coverImage?.publicId, "image"),
   ];
+  if (movie.videoFile?.publicId) {
+    tasks.push(deleteCloudinaryMedia(movie.videoFile.publicId, "video"));
+  }
   if (movie.hlsFolder) {
     tasks.push(cleanupHlsFolder(movie.hlsFolder));
   }

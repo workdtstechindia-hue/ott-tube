@@ -7,13 +7,24 @@ import {
   XCircleIcon,
 } from "@heroicons/react/24/outline";
 import { categoryAPI } from "./categoryAPI";
+import { moviesAPI } from "./moviesAPI";
 import { tagAPI } from "./tagAPI";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
-const MAX_VIDEO_SIZE = 500 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 25 * 1024 * 1024 * 1024;
+const CHUNK_SIZE = 4 * 1024 * 1024 * 1024;
+const MAX_PARALLEL_CHUNKS = 2;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-matroska"];
+const SESSION_STORAGE_PREFIX = "movie_upload_session:";
+const INITIAL_UPLOAD_STATUS = {
+  state: "idle",
+  progress: 0,
+  fileName: "",
+  speedKbps: 0,
+  message: "",
+};
 
 const createInitialFormState = (data = {}) => ({
   title: data?.title || "",
@@ -172,7 +183,9 @@ const MovieForm = ({
 }) => {
   const isSubmittingRef = useRef(false);
   const hydratedMovieIdRef = useRef(null);
+  const uploadAbortRef = useRef(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localUploadStatus, setLocalUploadStatus] = useState(INITIAL_UPLOAD_STATUS);
   const [form, setForm] = useState(() => createInitialFormState(initialData));
   const [errors, setErrors] = useState({});
   const [coverPreview, setCoverPreview] = useState(initialData?.coverImageUrl || null);
@@ -277,6 +290,188 @@ const MovieForm = ({
 
   const actorString = useMemo(() => form.actors.trim(), [form.actors]);
 
+  const getFileFingerprint = useCallback((file) => {
+    return `${file.name}:${file.size}:${file.lastModified}`;
+  }, []);
+
+  const getStoredSessionId = useCallback(
+    (file) => localStorage.getItem(`${SESSION_STORAGE_PREFIX}${getFileFingerprint(file)}`),
+    [getFileFingerprint]
+  );
+
+  const storeSessionId = useCallback(
+    (file, sessionId) => {
+      localStorage.setItem(`${SESSION_STORAGE_PREFIX}${getFileFingerprint(file)}`, sessionId);
+    },
+    [getFileFingerprint]
+  );
+
+  const clearStoredSessionId = useCallback(
+    (file) => {
+      localStorage.removeItem(`${SESSION_STORAGE_PREFIX}${getFileFingerprint(file)}`);
+    },
+    [getFileFingerprint]
+  );
+
+  const generateSessionId = useCallback(() => {
+    if (window?.crypto?.randomUUID) {
+      return window.crypto.randomUUID().replace(/[^a-zA-Z0-9-_]/g, "");
+    }
+    return `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+  }, []);
+
+  const resolveActiveSession = useCallback(async (file, totalChunks) => {
+    const storedSessionId = getStoredSessionId(file);
+    if (storedSessionId) {
+      try {
+        const existing = await moviesAPI.getUploadSession(storedSessionId);
+        if (
+          existing?.success &&
+          existing?.data?.fileName === file.name &&
+          existing?.data?.totalSize === file.size &&
+          existing?.data?.totalChunks === totalChunks &&
+          existing?.data?.status !== "completed"
+        ) {
+          return existing.data;
+        }
+      } catch {
+        // ignore and create a fresh session
+      }
+    }
+
+    const sessionId = generateSessionId();
+    const started = await moviesAPI.startUploadSession({
+      sessionId,
+      fileName: file.name,
+      totalSize: file.size,
+      totalChunks,
+    });
+    if (!started?.success || !started?.data) {
+      throw new Error(started?.message || "Failed to start upload session");
+    }
+
+    storeSessionId(file, sessionId);
+    return started.data;
+  }, [generateSessionId, getStoredSessionId, storeSessionId]);
+
+  const uploadVideoWithResume = useCallback(async (file) => {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const session = await resolveActiveSession(file, totalChunks);
+    const sessionId = session.sessionId;
+
+    const uploadedSet = new Set(Array.isArray(session.uploadedChunks) ? session.uploadedChunks : []);
+    const bytesByChunk = {};
+    for (const index of uploadedSet) {
+      const start = index * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      bytesByChunk[index] = Math.max(end - start, 0);
+    }
+
+    const getUploadedBytes = () =>
+      Object.values(bytesByChunk).reduce((sum, current) => sum + current, 0);
+
+    const updateProgress = (message = "Uploading video chunks...") => {
+      const uploadedBytes = getUploadedBytes();
+      const progress = Math.min(100, Math.round((uploadedBytes * 100) / file.size));
+      setLocalUploadStatus((prev) => ({
+        ...prev,
+        state: "uploading",
+        fileName: file.name,
+        progress,
+        message,
+      }));
+    };
+
+    updateProgress("Resuming upload...");
+
+    const pendingIndexes = [];
+    for (let index = 0; index < totalChunks; index += 1) {
+      if (!uploadedSet.has(index)) {
+        pendingIndexes.push(index);
+      }
+    }
+
+    if (pendingIndexes.length) {
+      uploadAbortRef.current = new AbortController();
+      let cursor = 0;
+
+      const worker = async () => {
+        while (cursor < pendingIndexes.length) {
+          const currentCursor = cursor;
+          cursor += 1;
+          const chunkIndex = pendingIndexes[currentCursor];
+
+          const start = chunkIndex * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const blobChunk = file.slice(start, end);
+
+          const chunkFormData = new FormData();
+          chunkFormData.append("sessionId", sessionId);
+          chunkFormData.append("chunkIndex", String(chunkIndex));
+          chunkFormData.append("totalChunks", String(totalChunks));
+          chunkFormData.append("fileName", file.name);
+          chunkFormData.append("totalSize", String(file.size));
+          chunkFormData.append("fileChunk", blobChunk, `${file.name}.part${chunkIndex}`);
+
+          await moviesAPI.uploadChunk(chunkFormData, {
+            signal: uploadAbortRef.current.signal,
+            onUploadProgress: (event) => {
+              bytesByChunk[chunkIndex] = Math.max(event.loaded || 0, bytesByChunk[chunkIndex] || 0);
+              updateProgress(`Uploading chunk ${chunkIndex + 1}/${totalChunks}`);
+            },
+          });
+
+          bytesByChunk[chunkIndex] = end - start;
+          uploadedSet.add(chunkIndex);
+          updateProgress(`Uploaded chunk ${chunkIndex + 1}/${totalChunks}`);
+        }
+      };
+
+      const workers = [];
+      const workerCount = Math.min(MAX_PARALLEL_CHUNKS, pendingIndexes.length);
+      for (let i = 0; i < workerCount; i += 1) {
+        workers.push(worker());
+      }
+      await Promise.all(workers);
+    }
+
+    setLocalUploadStatus((prev) => ({
+      ...prev,
+      state: "processing",
+      message: "Finalizing upload...",
+      progress: 100,
+    }));
+
+    const finalizeRes = await moviesAPI.finalizeUploadSession(sessionId);
+    if (!finalizeRes?.success || !finalizeRes?.data?.videoUrl || !finalizeRes?.data?.cloudinaryPublicId) {
+      throw new Error(finalizeRes?.message || "Failed to finalize upload");
+    }
+
+    clearStoredSessionId(file);
+    setLocalUploadStatus((prev) => ({
+      ...prev,
+      state: "success",
+      message: "Upload completed successfully",
+      progress: 100,
+    }));
+
+    return {
+      uploadSessionId: sessionId,
+      videoUrl: finalizeRes.data.videoUrl,
+      videoPublicId: finalizeRes.data.cloudinaryPublicId,
+    };
+  }, [clearStoredSessionId, resolveActiveSession]);
+
+  const cancelLocalUpload = useCallback(() => {
+    uploadAbortRef.current?.abort();
+    setLocalUploadStatus((prev) => ({
+      ...prev,
+      state: "canceled",
+      message: "Upload canceled",
+    }));
+    onCancelUpload?.();
+  }, [onCancelUpload]);
+
   const handleAddCategory = useCallback(async () => {
     const categoryName = form.newCategoryName.trim();
     if (!categoryName) return;
@@ -335,6 +530,7 @@ const MovieForm = ({
       isSubmittingRef.current = true;
       setIsSubmitting(true);
       try {
+        setLocalUploadStatus(INITIAL_UPLOAD_STATUS);
         const formData = new FormData();
         formData.append("title", form.title.trim());
         formData.append("description", form.description.trim());
@@ -346,15 +542,40 @@ const MovieForm = ({
           form.tagIds.forEach((tagId) => formData.append("tags", tagId));
         }
         if (coverFile) formData.append("cover", coverFile);
-        if (videoFile) formData.append("video", videoFile);
+
+        if (videoFile) {
+          const uploadResult = await uploadVideoWithResume(videoFile);
+          formData.append("uploadSessionId", uploadResult.uploadSessionId);
+          formData.append("videoUrl", uploadResult.videoUrl);
+          formData.append("videoPublicId", uploadResult.videoPublicId);
+        }
 
         await onSubmit?.(formData);
       } catch (error) {
+        const isCanceled =
+          error?.name === "CanceledError" ||
+          error?.code === "ERR_CANCELED" ||
+          error?.message === "canceled";
+        if (isCanceled) {
+          setLocalUploadStatus((prev) => ({
+            ...prev,
+            state: "canceled",
+            message: "Upload canceled",
+          }));
+          return;
+        }
+
+        setLocalUploadStatus((prev) => ({
+          ...prev,
+          state: "error",
+          message: error?.message || "Upload failed",
+        }));
         setErrors((prev) => ({
           ...prev,
           submit: error?.message || "Failed to submit movie form",
         }));
       } finally {
+        uploadAbortRef.current = null;
         isSubmittingRef.current = false;
         setIsSubmitting(false);
       }
@@ -370,10 +591,13 @@ const MovieForm = ({
       form.title,
       loading,
       onSubmit,
+      uploadVideoWithResume,
       validateForm,
       videoFile,
     ]
   );
+
+  const effectiveUploadStatus = localUploadStatus.state === "idle" ? uploadStatus : localUploadStatus;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -527,9 +751,9 @@ const MovieForm = ({
 
             <UploadZone
               title="Movie video"
-              hint="MP4, WEBM, MOV up to 500MB"
+              hint="MP4, WEBM, MOV (chunked resumable upload)"
               icon={VideoCameraIcon}
-              accept="video/mp4,video/webm,video/quicktime"
+              accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
               onFileSelect={setVideo}
               isDragging={isVideoDragging}
               onDragEnter={() => setIsVideoDragging(true)}
@@ -550,7 +774,7 @@ const MovieForm = ({
             ) : null}
           </div>
 
-          <UploadStatusCard uploadStatus={uploadStatus} onCancelUpload={onCancelUpload} />
+          <UploadStatusCard uploadStatus={effectiveUploadStatus} onCancelUpload={cancelLocalUpload} />
         </aside>
       </div>
 

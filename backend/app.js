@@ -17,6 +17,7 @@ const tagRoutes = require("./routes/tag.routes");
 const paymentRoutes = require("./routes/payment.routes");
 const adminRoutes = require("./routes/admin.routes");
 const userRoutes = require("./routes/user.routes");
+const uploadRoutes = require("./routes/upload.routes");
 const { notFoundHandler, errorHandler } = require("./middlewares/error.middleware");
 
 const app = express();
@@ -84,6 +85,7 @@ app.use("/api/tags", tagRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/upload", uploadRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
