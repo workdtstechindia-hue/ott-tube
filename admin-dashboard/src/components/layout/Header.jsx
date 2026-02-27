@@ -8,7 +8,7 @@ import {
   UserCircleIcon,
 } from "@heroicons/react/24/outline";
 
-const Header = ({ toggleSidebar, isSidebarOpen }) => {
+const Header = ({ toggleSidebar }) => {
   const dispatch = useDispatch();
   const { theme, toggleTheme } = useTheme();
 

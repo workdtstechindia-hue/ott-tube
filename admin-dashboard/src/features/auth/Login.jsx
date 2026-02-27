@@ -23,6 +23,7 @@ const Login = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (loading) return;
     dispatch(clearAuthError());
     dispatch(adminLogin(formData));
   };
@@ -30,11 +31,7 @@ const Login = () => {
   useEffect(() => {
     if (!token) return;
     const redirectPath = location.state?.from?.pathname || "/";
-    const timeout = setTimeout(() => {
-      navigate(redirectPath, { replace: true });
-    }, 600);
-
-    return () => clearTimeout(timeout);
+    navigate(redirectPath, { replace: true });
   }, [token, navigate, location.state]);
 
   return (
@@ -62,7 +59,7 @@ const Login = () => {
         {/* Success Message */}
         {token && (
           <div className="mb-4 p-3 text-sm text-green-600 bg-green-50 dark:bg-green-900/40 dark:text-green-400 rounded-lg">
-            Login successful. Redirecting...
+            Login successful.
           </div>
         )}
 

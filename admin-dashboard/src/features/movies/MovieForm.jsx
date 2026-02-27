@@ -6,7 +6,6 @@ import {
   VideoCameraIcon,
   XCircleIcon,
 } from "@heroicons/react/24/outline";
-import api from "../../api/axios";
 import { categoryAPI } from "./categoryAPI";
 import { tagAPI } from "./tagAPI";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -15,6 +14,20 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_VIDEO_SIZE = 500 * 1024 * 1024;
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+
+const createInitialFormState = (data = {}) => ({
+  title: data?.title || "",
+  description: data?.description || "",
+  price: data?.price || "",
+  rating: data?.rating || "",
+  actors: Array.isArray(data?.actors) ? data.actors.join(", ") : data?.actors || "",
+  categoryId: data?.category?.id || data?.category?._id || "",
+  tagIds: Array.isArray(data?.tags)
+    ? data.tags.map((tag) => tag.id || tag._id).filter(Boolean)
+    : [],
+  newCategoryName: "",
+  newTagName: "",
+});
 
 const Field = memo(function Field({
   name,
@@ -158,15 +171,9 @@ const MovieForm = ({
   onCancelUpload,
 }) => {
   const isSubmittingRef = useRef(false);
-  const [form, setForm] = useState(() => ({
-    title: initialData?.title || "",
-    description: initialData?.description || "",
-    price: initialData?.price || "",
-    rating: initialData?.rating || "",
-    actors: Array.isArray(initialData?.actors)
-      ? initialData.actors.join(", ")
-      : initialData?.actors || "",
-  }));
+  const hydratedMovieIdRef = useRef(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState(() => createInitialFormState(initialData));
   const [errors, setErrors] = useState({});
   const [coverPreview, setCoverPreview] = useState(initialData?.coverImageUrl || null);
   const [coverFile, setCoverFile] = useState(null);
@@ -177,30 +184,19 @@ const MovieForm = ({
   // categories / tags
   const [categories, setCategories] = useState([]);
   const [tagsList, setTagsList] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState(initialData?.category?.id || "");
-  const [selectedTags, setSelectedTags] = useState(
-    Array.isArray(initialData?.tags) ? initialData.tags.map((t) => t.id) : []
-  );
-  const [newCategoryName, setNewCategoryName] = useState("");
-  const [newTagName, setNewTagName] = useState("");
 
   useEffect(() => {
-    if (!initialData?.title) return;
-    setForm({
-      title: initialData.title || "",
-      description: initialData.description || "",
-      price: initialData.price || "",
-      rating: initialData.rating || "",
-      actors: Array.isArray(initialData.actors)
-        ? initialData.actors.join(", ")
-        : initialData.actors || "",
-    });
+    if (!isEdit) return;
+
+    const movieId = initialData?.id || initialData?._id;
+    if (!movieId || hydratedMovieIdRef.current === movieId) return;
+
+    hydratedMovieIdRef.current = movieId;
+    setForm(createInitialFormState(initialData));
     setCoverPreview(initialData.coverImageUrl || null);
-    setSelectedCategory(initialData?.category?.id || "");
-    setSelectedTags(
-      Array.isArray(initialData?.tags) ? initialData.tags.map((t) => t.id) : []
-    );
-  }, [initialData]);
+    setCoverFile(null);
+    setVideoFile(null);
+  }, [initialData, isEdit]);
 
   useEffect(() => {
     return () => {
@@ -223,7 +219,7 @@ const MovieForm = ({
           setCategories(Array.isArray(catResp?.data) ? catResp.data : []);
           setTagsList(Array.isArray(tagResp?.data) ? tagResp.data : []);
         }
-      } catch (err) {
+      } catch {
         // ignore - admin page already authenticated
       }
     };
@@ -282,28 +278,40 @@ const MovieForm = ({
   const actorString = useMemo(() => form.actors.trim(), [form.actors]);
 
   const handleAddCategory = useCallback(async () => {
-    if (!newCategoryName.trim()) return;
+    const categoryName = form.newCategoryName.trim();
+    if (!categoryName) return;
+
     try {
-      const res = await categoryAPI.create(newCategoryName);
+      const res = await categoryAPI.create(categoryName);
       setCategories((prev) => [...prev, res.data]);
-      setSelectedCategory(res.data._id);
-      setNewCategoryName("");
+      setForm((prev) => ({
+        ...prev,
+        categoryId: res.data._id,
+        newCategoryName: "",
+      }));
     } catch (err) {
       console.error("category add failed", err);
     }
-  }, [newCategoryName]);
+  }, [form.newCategoryName]);
 
   const handleAddTag = useCallback(async () => {
-    if (!newTagName.trim()) return;
+    const tagName = form.newTagName.trim();
+    if (!tagName) return;
+
     try {
-      const res = await tagAPI.create(newTagName);
+      const res = await tagAPI.create(tagName);
       setTagsList((prev) => [...prev, res.data]);
-      setSelectedTags((prev) => [...prev, res.data._id]);
-      setNewTagName("");
+      setForm((prev) => ({
+        ...prev,
+        tagIds: prev.tagIds.includes(res.data._id)
+          ? prev.tagIds
+          : [...prev.tagIds, res.data._id],
+        newTagName: "",
+      }));
     } catch (err) {
       console.error("tag add failed", err);
     }
-  }, [newTagName]);
+  }, [form.newTagName]);
 
   const validateForm = useCallback(() => {
     const nextErrors = {};
@@ -325,6 +333,7 @@ const MovieForm = ({
       if (!validateForm()) return;
 
       isSubmittingRef.current = true;
+      setIsSubmitting(true);
       try {
         const formData = new FormData();
         formData.append("title", form.title.trim());
@@ -332,9 +341,9 @@ const MovieForm = ({
         formData.append("price", String(form.price));
         if (form.rating) formData.append("rating", String(form.rating));
         if (actorString) formData.append("actors", actorString);
-        if (selectedCategory) formData.append("category", selectedCategory);
-        if (selectedTags.length) {
-          selectedTags.forEach((t) => formData.append("tags", t));
+        if (form.categoryId) formData.append("category", form.categoryId);
+        if (form.tagIds.length) {
+          form.tagIds.forEach((tagId) => formData.append("tags", tagId));
         }
         if (coverFile) formData.append("cover", coverFile);
         if (videoFile) formData.append("video", videoFile);
@@ -347,9 +356,23 @@ const MovieForm = ({
         }));
       } finally {
         isSubmittingRef.current = false;
+        setIsSubmitting(false);
       }
     },
-    [actorString, coverFile, form.description, form.price, form.rating, form.title, loading, onSubmit, validateForm, videoFile]
+    [
+      actorString,
+      coverFile,
+      form.categoryId,
+      form.description,
+      form.price,
+      form.rating,
+      form.tagIds,
+      form.title,
+      loading,
+      onSubmit,
+      validateForm,
+      videoFile,
+    ]
   );
 
   return (
@@ -393,8 +416,8 @@ const MovieForm = ({
           <label className="block text-sm">
             <span className="text-[var(--text-muted)]">Category</span>
             <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              value={form.categoryId}
+              onChange={(e) => setForm((prev) => ({ ...prev, categoryId: e.target.value }))}
               className="mt-1 block w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
             >
               <option value="">-- choose one --</option>
@@ -407,8 +430,8 @@ const MovieForm = ({
             <input
               type="text"
               placeholder="New category"
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
+              value={form.newCategoryName}
+              onChange={(e) => setForm((prev) => ({ ...prev, newCategoryName: e.target.value }))}
               className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm"
             />
             <button
@@ -426,10 +449,10 @@ const MovieForm = ({
             <select
               multiple
               size={Math.min(5, tagsList.length || 5)}
-              value={selectedTags}
+              value={form.tagIds}
               onChange={(e) => {
                 const opts = Array.from(e.target.selectedOptions).map((o) => o.value);
-                setSelectedTags(opts);
+                setForm((prev) => ({ ...prev, tagIds: opts }));
               }}
               className="mt-1 block w-full rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
             >
@@ -442,8 +465,8 @@ const MovieForm = ({
             <input
               type="text"
               placeholder="New tag"
-              value={newTagName}
-              onChange={(e) => setNewTagName(e.target.value)}
+              value={form.newTagName}
+              onChange={(e) => setForm((prev) => ({ ...prev, newTagName: e.target.value }))}
               className="flex-1 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-sm"
             />
             <button
@@ -534,11 +557,11 @@ const MovieForm = ({
       <div className="flex justify-end">
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || isSubmitting}
           className="inline-flex min-w-40 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition transform hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60"
           style={{ transitionProperty: "transform, box-shadow" }}
         >
-          {loading ? (
+          {loading || isSubmitting ? (
             <>
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               Saving...

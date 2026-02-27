@@ -1,4 +1,5 @@
 const User = require("../models/user.model");
+const bcrypt = require("bcryptjs");
 const ApiError = require("../utils/ApiError");
 const asyncHandler = require("../utils/asyncHandler");
 const { signToken } = require("../utils/jwt");
@@ -115,22 +116,6 @@ const register = asyncHandler(async (req, res) => {
   return sendAuthSuccess(res, user, "Login successful", 200);
 });
 
-const loginBase = async (email, password) => {
-  const user = await User.findOne({ email })
-    .select("+password _id name email role isActive")
-    .exec();
-  if (!user || !user.isActive) {
-    throw new ApiError(401, "Invalid credentials");
-  }
-
-  const matched = await user.comparePassword(password);
-  if (!matched) {
-    throw new ApiError(401, "Invalid credentials");
-  }
-
-  return user;
-};
-
 const login = asyncHandler(async (req, res) => {
   const { normalizedEmail, normalizedPassword } = validateLoginPayload(req.body);
   const envAdmin = getEnvAdmin();
@@ -143,7 +128,19 @@ const login = asyncHandler(async (req, res) => {
     return sendAuthSuccess(res, envAdmin, "Login successful", 200);
   }
 
-  const user = await loginBase(normalizedEmail, normalizedPassword);
+  const user = await User.findOne({ email: normalizedEmail })
+    .select("+password _id name email role isActive")
+    .lean()
+    .exec();
+
+  if (!user || !user.isActive) {
+    throw new ApiError(401, "Invalid credentials");
+  }
+
+  const matched = await bcrypt.compare(normalizedPassword, user.password);
+  if (!matched) {
+    throw new ApiError(401, "Invalid credentials");
+  }
 
   return sendAuthSuccess(res, user, "Login successful", 200);
 });
